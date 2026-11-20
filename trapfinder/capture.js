@@ -1,4 +1,4 @@
-// Rise HTML-Finder – läuft ab Seitenstart im Seitenkontext von *.articulate.com.
+// TrapFinder – läuft ab Seitenstart im Seitenkontext von *.articulate.com.
 // Liest die Kursdaten mit, die der Rise-Editor (oder die Vorschau) per fetch/XHR vom Server lädt.
 // Es wird nichts verändert oder verschickt; die Daten bleiben in window.__riseCapture.
 (() => {

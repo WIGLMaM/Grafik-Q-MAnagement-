@@ -8,6 +8,7 @@ const KINDS = [
   { id: 'Custom Block', label: 'Custom Block' },
   { id: 'Storyline', label: 'Storyline (SL)' },
   { id: 'Szenario', label: 'Szenario' },
+  { id: 'Dokument', label: 'PDF/Word-Dateien' },
 ];
 const kindLabel = (k) => (KINDS.find((x) => x.id === k) || {}).label || k;
 let selected = new Set(KINDS.map((k) => k.id));
@@ -76,6 +77,7 @@ async function scan() {
       state = { result: withData[0].result, frameId: withData[0].frameId };
       await save();
       render();
+      enrichStoryline();
       return;
     }
     const withLinks = frames.filter((f) => f.result.lessonLinks > 0).sort((a, b) => b.result.lessonLinks - a.result.lessonLinks);
@@ -107,6 +109,7 @@ async function crawl() {
     await save();
     $('fallback').hidden = true;
     render();
+    enrichStoryline();
   } catch (e) {
     setStatus(`Fehler: ${esc(e.message)}`);
   } finally {
@@ -158,11 +161,36 @@ function render() {
     btn.title = it.preview || it.name;
     btn.innerHTML =
       `<span class="name"><span class="badge">${esc(kindLabel(it.kind))}</span>${esc(it.name)}</span>` +
-      `<span class="meta">Block ${it.blockNo}${it.urls[0] ? ' · ' + esc(it.urls[0]) : ''}` +
+      `<span class="meta">Block ${it.blockNo}` +
+      `${it.slTitle && it.slTitle !== it.name ? ' · SL-Titel: ' + esc(it.slTitle) : ''}` +
+      `${it.urls[0] ? ' · ' + esc(it.urls[0]) : ''}` +
       `${it.blockType && it.blockType !== '–' ? ' · Rise-Typ: ' + esc(it.blockType) : ''}</span>`;
     btn.addEventListener('click', () => goTo(it));
     box.appendChild(btn);
   });
+}
+
+// Storyline-Titel aus der veröffentlichten story.html lesen (<title>)
+async function enrichStoryline() {
+  const todo = state.result.items.filter((it) => it.kind === 'Storyline' && it.storyUrl && it.slTitle === undefined);
+  if (!todo.length) return;
+  await Promise.all(
+    todo.map(async (it) => {
+      it.slTitle = '';
+      try {
+        const res = await fetch(it.storyUrl, { credentials: 'include' });
+        if (!res.ok) return;
+        const m = (await res.text()).match(/<title[^>]*>([^<]*)<\/title>/i);
+        const t = m ? m[1].replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim() : '';
+        if (t && !/^(story|storyline|untitled)$/i.test(t)) {
+          it.slTitle = t;
+          if (!it.nameFromData) it.name = t;
+        }
+      } catch (_) { /* nicht erreichbar */ }
+    })
+  );
+  await save();
+  render();
 }
 
 async function goTo(it) {
@@ -204,13 +232,13 @@ function download(name, content, type) {
 }
 
 const fileBase = () =>
-  `Block-Protokoll_${(state.result.courseTitle || 'Rise-Kurs').replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 60)}_${new Date().toISOString().slice(0, 10)}`;
+  `TrapFinder-Protokoll_${(state.result.courseTitle || 'Rise-Kurs').replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 60)}_${new Date().toISOString().slice(0, 10)}`;
 
 function exportCsv() {
-  const cols = ['Nr', 'Kapitel', 'Lektion-Nr', 'Lektion', 'Block-Nr', 'Typ', 'Name', 'Blocktyp (Rise)', 'Quellen', 'Link', 'Block-ID', 'Code-Vorschau'];
+  const cols = ['Nr', 'Kapitel', 'Lektion-Nr', 'Lektion', 'Block-Nr', 'Typ', 'Name', 'Storyline-Titel', 'Blocktyp (Rise)', 'Quellen', 'Link', 'Block-ID', 'Code-Vorschau'];
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = visibleItems().map((it, i) =>
-    [i + 1, it.chapter, it.lessonNo, it.lesson, it.blockNo, kindLabel(it.kind), it.name, it.blockType, it.urls.join(' | '), it.url, it.blockId, it.preview].map(q).join(';')
+    [i + 1, it.chapter, it.lessonNo, it.lesson, it.blockNo, kindLabel(it.kind), it.name, it.slTitle || '', it.blockType, it.urls.join(' | '), it.url, it.blockId, it.preview].map(q).join(';')
   );
   download(`${fileBase()}.csv`, '﻿' + [cols.map(q).join(';'), ...rows].join('\r\n'), 'text/csv;charset=utf-8');
 }
@@ -223,7 +251,7 @@ function exportHtml() {
     .map(
       (it, i) => `<tr>
   <td>${i + 1}</td><td>${esc(it.chapter)}</td><td>${it.lessonNo}. ${esc(it.lesson)}</td><td>${it.blockNo}</td>
-  <td>${esc(kindLabel(it.kind))}</td><td>${esc(it.name)}</td>
+  <td>${esc(kindLabel(it.kind))}</td><td>${esc(it.name)}${it.slTitle && it.slTitle !== it.name ? `<br><small>SL-Titel: ${esc(it.slTitle)}</small>` : ''}</td>
   <td>${it.urls.map((u) => `<a href="${esc(u)}">${esc(u)}</a>`).join('<br>')}</td>
   <td><a href="${esc(it.url)}">öffnen</a></td>
   <td><code>${esc(it.preview)}</code></td></tr>`
@@ -236,7 +264,7 @@ h1{font-size:20px;margin:0 0 4px}.meta{color:#656d76;margin-bottom:16px}
 table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8dee4;padding:6px 8px;vertical-align:top;text-align:left}
 th{background:#f6f8fa}code{font-size:12px;word-break:break-all;white-space:pre-wrap}
 </style></head><body>
-<h1>Block-Protokoll: ${esc(r.courseTitle)}</h1>
+<h1>TrapFinder-Protokoll: ${esc(r.courseTitle)}</h1>
 <div class="meta">Kurs-Link: <a href="${esc(r.baseUrl)}">${esc(r.baseUrl)}</a><br>Erstellt: ${esc(date)} · ${items.length} Fundstellen in ${r.lessonCount} Lektionen<br>Kategorien: ${esc([...selected].join(', '))}${r.source === 'dom' ? ' · Quelle: Seitenansicht' : ''}</div>
 <table><thead><tr><th>Nr</th><th>Kapitel</th><th>Lektion</th><th>Block</th><th>Typ</th><th>Name</th><th>Quellen</th><th>Link</th><th>Code-Vorschau</th></tr></thead>
 <tbody>${rows}</tbody></table></body></html>`;
@@ -265,7 +293,7 @@ th{background:#f6f8fa}code{font-size:12px;word-break:break-all;white-space:pre-w
   if (Array.isArray(stored)) {
     selected = new Set(stored.filter((k) => KINDS.some((x) => x.id === k)));
     // Neu hinzugekommene Kategorien standardmässig aktivieren
-    const known = Array.isArray(knownKinds) ? knownKinds : ['Embed', 'Code-/HTML-Block', 'HTML im Inhalt', 'Storyline', 'Szenario'];
+    const known = Array.isArray(knownKinds) ? knownKinds : ['Embed', 'Code-/HTML-Block', 'Custom Block', 'Storyline', 'Szenario'];
     KINDS.forEach((k) => { if (!known.includes(k.id)) selected.add(k.id); });
   }
   renderFilters();

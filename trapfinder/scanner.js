@@ -1,4 +1,4 @@
-// Rise HTML-Finder – wird im Seitenkontext (MAIN world) des Rise-Kurses ausgeführt.
+// TrapFinder – wird im Seitenkontext (MAIN world) des Rise-Kurses ausgeführt.
 // Stellt window.__riseHtmlFinder mit scan(), crawl() und goTo() bereit.
 (() => {
   if (window.__riseHtmlFinder) return;
@@ -193,44 +193,129 @@
   }
 
   const STORYLINE_SRC = /story(_html5)?\.html|storyline/i;
+  // PDF- und Word-Dateien
+  const DOC_EXT = /\.(pdf|docx?|dotx|docm|rtf|odt)(?=$|[?#"'\s])/i;
 
   function isStoryline(block, typeStr) {
     if (/storyline/i.test(typeStr)) return true;
     return collectStrings(block, /^(src|url|type|kind|mediaType)$/i).some((s) => STORYLINE_SRC.test(s));
   }
 
+  // Alle Strings eines Blocks mit Schlüsselpfad
+  function allStrings(obj, path = '', out = [], depth = 10, seen = new WeakSet()) {
+    if (!obj || typeof obj !== 'object' || depth < 0 || seen.has(obj)) return out;
+    seen.add(obj);
+    for (const [k, v] of Object.entries(obj)) {
+      const p = path ? `${path}.${k}` : k;
+      if (typeof v === 'string') out.push({ key: k, path: p, value: v });
+      else if (v && typeof v === 'object') allStrings(v, p, out, depth - 1, seen);
+    }
+    return out;
+  }
+
+  const fileBase = (u) => {
+    let f = String(u).split(/[?#]/)[0].split(/[\\/]/).pop() || '';
+    try { f = decodeURIComponent(f); } catch (_) { /* ignore */ }
+    return f;
+  };
+
+  // PDF-/Word-Dateien eines Blocks finden (Anhänge, Links in Text und Buttons)
+  function findDocuments(block, typeStr) {
+    const files = new Map(); // Dateiname -> URL
+    for (const { key, value } of allStrings(block)) {
+      if (/<a\b|href\s*=/i.test(value)) {
+        const re = /href\s*=\s*["']([^"']+)["']/gi;
+        let m;
+        while ((m = re.exec(value))) if (DOC_EXT.test(m[1])) files.set(fileBase(m[1]), m[1]);
+      } else if (value.length < 2000 && DOC_EXT.test(value)) {
+        const isName = /name|title|file/i.test(key) && !/[\\/]/.test(value);
+        const name = isName ? value.trim() : fileBase(value);
+        if (!name) continue;
+        if (![...files.keys()].some((n) => n.toLowerCase() === name.toLowerCase())) {
+          files.set(name, /^https?:|^\//.test(value) ? value : files.get(name) || '');
+        }
+      }
+    }
+    // Anhang-Block ohne erkennbare Dateiendung trotzdem melden
+    if (!files.size && /attachment/i.test(typeStr)) {
+      const n = collectStrings(block, /^(fileName|filename|originalName|name|title)$/i, [], 8).map(stripHtml).filter(Boolean)[0];
+      return [{ name: n || 'Anhang (Dateityp unbekannt)', url: '' }];
+    }
+    // Namen bevorzugen, die nicht nur aus einer Hash-ID bestehen
+    return [...files.entries()].map(([name, url]) => ({ name, url }));
+  }
+
+  // Name der Storyline-Datei/-Projekt aus den Blockdaten
+  function storylineInfo(block) {
+    const strings = allStrings(block);
+    const story = strings.find((x) => /story(_html5)?\.html/i.test(x.value) && x.value.length < 1000);
+    let storyUrl = '';
+    if (story) {
+      const v = story.value.trim();
+      try { storyUrl = new URL(v, location.href).href; } catch (_) { /* ignore */ }
+    }
+    const generic = /^(storyline|story|story\.html|index|untitled|ohne titel)$/i;
+    const names = strings
+      .filter((x) => /^(title|name|fileName|filename|originalName|originalFilename|projectName|displayName)$/i.test(x.key))
+      .map((x) => ({ path: x.path, v: stripHtml(x.value).replace(/\.(story|zip|html?)$/i, '').trim() }))
+      .filter((x) => x.v && x.v.length < 200 && !/^https?:|[\\/]/.test(x.v) && !generic.test(x.v));
+    // Werte aus Storyline-/Media-Objekten bevorzugen
+    names.sort((a, b) => (/storyline|media|file/i.test(b.path) ? 1 : 0) - (/storyline|media|file/i.test(a.path) ? 1 : 0));
+    return { slName: names[0] ? names[0].v : '', storyUrl };
+  }
+
   function describeBlock(block) {
     const typeStr = [block.type, block.family, block.variant].filter(Boolean).join(' / ');
+    const out = [];
     const storyline = isStoryline(block, typeStr);
     const scenario = !storyline && /scenario/i.test(typeStr);
     const hint = TYPE_HINT.test(typeStr);
     const raw = storyline || scenario ? null : findRawHtml(block);
-    if (!storyline && !scenario && !hint) return null;
 
-    let kind;
-    if (storyline) kind = 'Storyline';
-    else if (scenario) kind = 'Szenario';
-    else if (/custom/i.test(typeStr)) kind = 'Custom Block';
-    else if (/embed|iframe/i.test(typeStr)) kind = 'Embed';
-    else kind = 'Code-/HTML-Block';
+    if (storyline || scenario || hint) {
+      let kind;
+      if (storyline) kind = 'Storyline';
+      else if (scenario) kind = 'Szenario';
+      else if (/custom/i.test(typeStr)) kind = 'Custom Block';
+      else if (/embed|iframe/i.test(typeStr)) kind = 'Embed';
+      else kind = 'Code-/HTML-Block';
 
-    const urls = extractUrls(raw, block);
-    const titleCandidates = [
-      ...collectStrings(block, /^(title|heading|name|caption|label)$/i, [], 3),
-    ].map(stripHtml).filter(Boolean);
-    let name = titleCandidates[0] || '';
-    if (!name && urls[0]) name = hostOf(urls[0]);
-    if (!name && raw) name = raw.replace(/\s+/g, ' ').trim().slice(0, 60);
-    if (!name) name = storyline ? 'Storyline-Block (ohne Titel)' : scenario ? 'Szenario (ohne Titel)' : '(ohne Titel)';
+      const urls = extractUrls(raw, block);
+      const sl = storyline ? storylineInfo(block) : { slName: '', storyUrl: '' };
+      if (sl.storyUrl && !urls.includes(sl.storyUrl)) urls.unshift(sl.storyUrl);
+      const titleCandidates = collectStrings(block, /^(title|heading|name|caption|label)$/i, [], 3).map(stripHtml).filter(Boolean);
+      let name = sl.slName || titleCandidates[0] || '';
+      if (!name && !storyline && urls[0]) name = hostOf(urls[0]);
+      if (!name && raw) name = raw.replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (!name) name = storyline ? 'Storyline-Block (ohne Titel)' : scenario ? 'Szenario (ohne Titel)' : '(ohne Titel)';
 
-    const codeSource = raw || collectStrings(block, /(code|html|embed|content|markup)/i)[0] || '';
-    return {
-      kind,
-      blockType: typeStr || '–',
-      name,
-      urls,
-      preview: String(codeSource).replace(/\s+/g, ' ').trim().slice(0, 400),
-    };
+      const codeSource = raw || collectStrings(block, /(code|html|embed|content|markup)/i)[0] || '';
+      out.push({
+        kind,
+        blockType: typeStr || '–',
+        name,
+        nameFromData: !!(sl.slName || titleCandidates[0]),
+        storyUrl: sl.storyUrl,
+        urls,
+        preview: String(codeSource).replace(/\s+/g, ' ').trim().slice(0, 400),
+      });
+    }
+
+    if (!storyline) {
+      const docs = findDocuments(block, typeStr);
+      if (docs.length) {
+        out.push({
+          kind: 'Dokument',
+          blockType: typeStr || '–',
+          name: docs.map((d) => d.name).join(', '),
+          nameFromData: true,
+          storyUrl: '',
+          urls: docs.map((d) => d.url).filter(Boolean).slice(0, 10),
+          preview: docs.map((d) => d.name).join(' | '),
+        });
+      }
+    }
+    return out;
   }
 
   function analyzeCourse(course) {
@@ -246,9 +331,7 @@
       lessonNo++;
       (lesson.items || []).forEach((block, i) => {
         if (!block || typeof block !== 'object') return;
-        const d = describeBlock(block);
-        if (!d) return;
-        items.push({
+        for (const d of describeBlock(block)) items.push({
           chapter: chapter || '–',
           lesson: stripHtml(lesson.title) || `Lektion ${lessonNo}`,
           lessonNo,
@@ -306,6 +389,17 @@
     const out = [];
     const blocks = [...document.querySelectorAll('[data-block-id]')];
     blocks.forEach((b, i) => {
+      const base = {
+        chapter: '–', lesson: lesson.title, lessonNo, lessonId: lesson.id,
+        blockId: b.getAttribute('data-block-id'), blockNo: i + 1, url: lessonUrl(lesson.id),
+        blockType: 'aus Seitenansicht erkannt', nameFromData: false, storyUrl: '',
+      };
+      const docs = [...b.querySelectorAll('a[href]')].filter((a) => DOC_EXT.test(a.getAttribute('href')));
+      if (docs.length) {
+        const names = [...new Set(docs.map((a) => a.getAttribute('download') || fileBase(a.getAttribute('href'))))];
+        out.push({ ...base, kind: 'Dokument', name: names.join(', '), nameFromData: true,
+          urls: docs.map((a) => a.href).slice(0, 10), preview: names.join(' | ') });
+      }
       const iframe = b.querySelector('iframe');
       const code = b.querySelector('pre, code');
       const scenario = /scenario/i.test(b.className) || b.querySelector('[class*="scenario" i]');
@@ -316,15 +410,9 @@
       const kind = storyline ? 'Storyline' : scenario ? 'Szenario' : custom ? 'Custom Block' : iframe ? 'Embed' : 'Code-/HTML-Block';
       const heading = stripHtml((b.querySelector('h1,h2,h3,h4') || {}).textContent);
       out.push({
-        chapter: '–',
-        lesson: lesson.title,
-        lessonNo,
-        lessonId: lesson.id,
-        blockId: b.getAttribute('data-block-id'),
-        blockNo: i + 1,
-        url: lessonUrl(lesson.id),
+        ...base,
         kind,
-        blockType: 'aus Seitenansicht erkannt',
+        storyUrl: storyline && src ? new URL(src, location.href).href : '',
         name: (iframe && iframe.title) || heading || (src && hostOf(src)) || '(ohne Titel)',
         urls: src && !src.startsWith('about:') ? [src] : [],
         preview: iframe

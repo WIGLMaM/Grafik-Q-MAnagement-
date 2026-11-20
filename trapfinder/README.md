@@ -1,16 +1,16 @@
-# Rise HTML-Finder (Chrome-Erweiterung)
+# TrapFinder (Chrome-Erweiterung)
 
-Findet manuell eingebaute HTML-, Code- und Embed-Blöcke sowie Storyline- und
-Szenario-Blöcke in einem Articulate-Rise-Kurs,
+Findet HTML-, Code-, Embed- und Custom-Blöcke, Storyline- und Szenario-Blöcke
+sowie PDF-/Word-Dateien in einem Articulate-Rise-Kurs,
 zeigt deren Standort (Kapitel → Lektion → Block) an, springt per Klick dorthin und
 erstellt ein Protokoll (HTML oder CSV).
 
 ## Installation
 
-1. Diesen Ordner `rise-html-finder` lokal speichern.
+1. Diesen Ordner `trapfinder` lokal speichern.
 2. In Chrome `chrome://extensions` öffnen.
 3. Oben rechts den **Entwicklermodus** einschalten.
-4. **Entpackte Erweiterung laden** klicken und den Ordner `rise-html-finder` wählen.
+4. **Entpackte Erweiterung laden** klicken und den Ordner `trapfinder` wählen.
 5. Optional: Über das Puzzle-Symbol die Erweiterung an die Toolbar anheften.
 
 ## Bedienung
@@ -36,6 +36,10 @@ erstellt ein Protokoll (HTML oder CSV).
 | Custom Block | von Rise vordefinierte Custom Blocks |
 | Storyline (SL) | Storyline-Blöcke bzw. Blöcke, die auf `story.html` verweisen |
 | Szenario | Rise-Szenario-Blöcke |
+| PDF/Word-Dateien | Anhänge sowie Links auf `.pdf`, `.doc`, `.docx`, `.dotx`, `.rtf`, `.odt` (auch in Text und Buttons) |
+
+Bei Storyline-Blöcken wird der Name der Storyline angezeigt. Fehlt er in den Kursdaten,
+liest die Erweiterung den Titel aus der veröffentlichten `story.html`.
 
 Die Erweiterung liest zuerst die Kursdaten der Seite (mit Kapiteln). Klappt das nicht,
 kann sie sich über **Lektionen durchsuchen** durch alle Lektionen klicken und die
