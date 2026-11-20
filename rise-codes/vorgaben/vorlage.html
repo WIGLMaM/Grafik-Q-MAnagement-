@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vorlage</title>
+
+<!-- =====================================================================
+     EINSTELLUNGEN
+     In der jeweiligen Rise-Sprachkopie NUR die Zeile SPRACHE ändern:
+       'de' = Deutsch   'fr' = Français (CH)   'it' = Italiano (CH)   'en' = English (UK)
+     ===================================================================== -->
+<script>
+  const SPRACHE = 'de';
+  const CODE_ID = 'vorlage';   // eindeutiger Name dieser Grafik (nicht ändern)
+  const STAND = '20.11.2026 · Vorlage';   // wird vom Lektorats-Werkzeug gesetzt (nicht von Hand ändern)
+</script>
+
+<!-- =====================================================================
+     ALLE TEXTE
+     Nur den Text zwischen den Anführungszeichen übersetzen.
+     {n} ist ein Platzhalter für die Nummer und muss stehen bleiben.
+     Französisch: einfach normale Leerzeichen vor ? ! : ; % setzen,
+     die geschützten Leerzeichen werden automatisch eingefügt.
+     ===================================================================== -->
+<script>
+const TEXTE = {
+
+  /* ---------------------------- DEUTSCH ---------------------------- */
+  de: {
+    seitentitel: 'Vorlage',
+    titel: 'Titel der Grafik',
+    intro: 'Eine kurze Einleitung, worum es geht.',
+    karteVon: 'Karte {n} von 3',
+    mehr: 'Mehr anzeigen',
+    weniger: 'Weniger anzeigen',
+    karten: [
+      { titel: 'Erste Karte', text: 'Kurzer Text zur ersten Karte.', detail: 'Zusätzliche Erklärung, die erst nach einem Klick erscheint.' },
+      { titel: 'Zweite Karte', text: 'Kurzer Text zur zweiten Karte.', detail: 'Zusätzliche Erklärung zur zweiten Karte.' },
+      { titel: 'Dritte Karte', text: 'Kurzer Text zur dritten Karte.', detail: 'Zusätzliche Erklärung zur dritten Karte.' }
+    ]
+  },
+
+  /* ---------------------------- FRANÇAIS (CH) ---------------------------- */
+  fr: {
+    seitentitel: 'Modèle',
+    titel: 'Titre du graphique',
+    intro: 'Une brève introduction au sujet.',
+    karteVon: 'Carte {n} sur 3',
+    mehr: 'Afficher plus',
+    weniger: 'Afficher moins',
+    karten: [
+      { titel: 'Première carte', text: 'Texte court sur la première carte.', detail: 'Explication supplémentaire qui apparaît après un clic.' },
+      { titel: 'Deuxième carte', text: 'Texte court sur la deuxième carte.', detail: 'Explication supplémentaire sur la deuxième carte.' },
+      { titel: 'Troisième carte', text: 'Texte court sur la troisième carte.', detail: 'Explication supplémentaire sur la troisième carte.' }
+    ]
+  },
+
+  /* ---------------------------- ITALIANO (CH) ---------------------------- */
+  it: {
+    seitentitel: 'Modello',
+    titel: 'Titolo del grafico',
+    intro: 'Una breve introduzione all’argomento.',
+    karteVon: 'Scheda {n} di 3',
+    mehr: 'Mostra di più',
+    weniger: 'Mostra di meno',
+    karten: [
+      { titel: 'Prima scheda', text: 'Breve testo sulla prima scheda.', detail: 'Spiegazione aggiuntiva che appare dopo un clic.' },
+      { titel: 'Seconda scheda', text: 'Breve testo sulla seconda scheda.', detail: 'Spiegazione aggiuntiva sulla seconda scheda.' },
+      { titel: 'Terza scheda', text: 'Breve testo sulla terza scheda.', detail: 'Spiegazione aggiuntiva sulla terza scheda.' }
+    ]
+  },
+
+  /* ---------------------------- ENGLISH (UK) ---------------------------- */
+  en: {
+    seitentitel: 'Template',
+    titel: 'Title of the graphic',
+    intro: 'A short introduction to the topic.',
+    karteVon: 'Card {n} of 3',
+    mehr: 'Show more',
+    weniger: 'Show less',
+    karten: [
+      { titel: 'First card', text: 'Short text about the first card.', detail: 'Additional explanation that appears after a click.' },
+      { titel: 'Second card', text: 'Short text about the second card.', detail: 'Additional explanation about the second card.' },
+      { titel: 'Third card', text: 'Short text about the third card.', detail: 'Additional explanation about the third card.' }
+    ]
+  }
+};
+</script>
+
+<!-- BAUSTEIN:sprachsystem START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/sprachsystem.html -->
+<script>
+  /* Sprache wählen (zum Testen auch über ?lang=fr in der Adresse) */
+  const urlLang = new URLSearchParams(location.search).get('lang');
+  const LANG = TEXTE[urlLang] ? urlLang : (TEXTE[SPRACHE] ? SPRACHE : 'de');
+  const T = TEXTE[LANG];
+  const OVERRIDES = {};   // vorläufige Korrekturen aus dem Lektoratsmodus
+
+  function pathOf(key){ return key.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s); }
+  function getAt(obj, path){ return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+
+  /* Text aus TEXTE (ohne Korrekturen); fehlt er in der Sprache, gilt der deutsche */
+  function baseText(key){
+    const p = pathOf(key);
+    const v = getAt(T, p);
+    if(typeof v === 'string') return v;
+    const d = getAt(TEXTE.de, p);
+    return typeof d === 'string' ? d : '';
+  }
+  function rawText(key){ return key in OVERRIDES ? OVERRIDES[key] : baseText(key); }
+
+  /* Französisch: geschützte Leerzeichen vor ? ! ; (schmal) und vor : % (normal) */
+  function fein(text){
+    if(LANG !== 'fr') return text;
+    return text.replace(/ ([?!;])/g, ' $1').replace(/ ([:%])/g, ' $1');
+  }
+
+  /* Elemente mit data-key="…" zeigen den Text; data-n="…" ersetzt {n}.
+     Attribute: data-key-aria-label, data-key-alt, data-key-title, data-key-placeholder */
+  const ATTR_KEYS = ['aria-label', 'alt', 'title', 'placeholder'];
+  function renderEl(e){
+    if(e.dataset.key){
+      let t = rawText(e.dataset.key);
+      if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
+      e.textContent = fein(t);
+    }
+    ATTR_KEYS.forEach(a => {
+      const k = e.getAttribute('data-key-' + a);
+      if(k){
+        let t = rawText(k);
+        if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
+        e.setAttribute(a, fein(t));
+      }
+    });
+  }
+  function renderKey(key){
+    document.querySelectorAll('[data-key="' + key + '"]').forEach(renderEl);
+    ATTR_KEYS.forEach(a => document.querySelectorAll('[data-key-' + a + '="' + key + '"]').forEach(renderEl));
+  }
+  function renderAll(){
+    document.querySelectorAll('[data-key],' + ATTR_KEYS.map(a => '[data-key-' + a + ']').join(',')).forEach(renderEl);
+  }
+
+  document.documentElement.lang = { de:'de-CH', fr:'fr-CH', it:'it-CH', en:'en-GB' }[LANG] || LANG;
+  document.title = baseText('seitentitel');
+</script>
+<!-- BAUSTEIN:sprachsystem ENDE -->
+
+<style>
+  /* BAUSTEIN:corporate-design START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/corporate-design.css */
+  @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
+
+  :root{
+    /* ---------- Farben ---------- */
+    --cd-primaer:#501688;        /* Hauptfarbe: Titel, Buttons, dunkle Flächen */
+    --cd-primaer-80:#7345a0;     /* Untertitel, Hinweise, Hover */
+    --cd-primaer-60:#9673b8;     /* mittlere Flächen */
+    --cd-primaer-30:#b9a2cf;     /* helle Flächen, Akzente */
+    --cd-primaer-10:#dcd0e7;     /* sehr helle Flächen */
+    --cd-hintergrund:#ececec;    /* Seitenhintergrund, Zeilen */
+    --cd-flaeche:#ffffff;        /* Karten, Panels */
+    --cd-text:#2b2430;           /* Fliesstext */
+    --cd-text-hell:#ffffff;      /* Text auf dunklen Flächen */
+    --cd-linie:#dcd0e7;          /* Rahmen, Trennlinien */
+
+    /* ---------- Schrift ---------- */
+    --cd-schrift:'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --cd-gewicht-normal:400;
+    --cd-gewicht-mittel:600;
+    --cd-gewicht-fett:700;
+    --cd-gewicht-extra:800;
+
+    /* ---------- Textgrössen ---------- */
+    --cd-titel:clamp(26px, 4.6vw, 40px);         /* Haupttitel der Grafik */
+    --cd-untertitel:clamp(14px, 2.4vw, 17px);    /* Einleitung unter dem Titel */
+    --cd-zwischentitel:clamp(16px, 2.2vw, 19px); /* Titel von Karten, Stufen, Fragen */
+    --cd-text-gross:16px;                        /* hervorgehobener Text */
+    --cd-text-normal:14px;                       /* Fliesstext */
+    --cd-text-klein:13px;                        /* Tabellen, Buttons, Zusatzinfos */
+    --cd-label:12px;                             /* kleine Labels, oft in Grossbuchstaben */
+
+    /* ---------- Formen ---------- */
+    --cd-radius:4px;                             /* Eckenrundung */
+  }
+  /* BAUSTEIN:corporate-design ENDE */
+
+  /* =====================================================================
+     GRAFIK-DESIGN (individuell für diese Grafik)
+     Nur Farben, Schriften und Grössen aus dem Corporate Design verwenden: var(--cd-…)
+     ===================================================================== */
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:var(--cd-schrift); color:var(--cd-text); background:var(--cd-hintergrund); -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:980px; margin:0 auto; padding:28px 20px 40px; }
+  header.top{ text-align:center; margin-bottom:24px; }
+  header.top h1{ font-size:var(--cd-titel); font-weight:var(--cd-gewicht-extra); color:var(--cd-primaer); margin:0 0 6px; }
+  header.top p{ font-size:var(--cd-untertitel); font-weight:var(--cd-gewicht-mittel); color:var(--cd-primaer-80); margin:0; line-height:1.5; }
+  .karten{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
+  .karte{ background:var(--cd-flaeche); border:1.5px solid var(--cd-linie); border-radius:var(--cd-radius); padding:18px; display:flex; flex-direction:column; gap:8px; }
+  .karte .label{ font-size:var(--cd-label); font-weight:var(--cd-gewicht-fett); letter-spacing:.07em; text-transform:uppercase; color:var(--cd-primaer-80); }
+  .karte h2{ font-size:var(--cd-zwischentitel); font-weight:var(--cd-gewicht-extra); color:var(--cd-primaer); margin:0; }
+  .karte p{ font-size:var(--cd-text-normal); line-height:1.5; margin:0; }
+  .karte .detail{ display:none; background:var(--cd-hintergrund); border-radius:var(--cd-radius); padding:10px; }
+  .karte.offen .detail{ display:block; }
+  .karte button{ align-self:flex-start; border:0; border-radius:var(--cd-radius); background:var(--cd-primaer); color:var(--cd-text-hell); font:inherit; font-size:var(--cd-text-klein); font-weight:var(--cd-gewicht-fett); padding:8px 14px; cursor:pointer; }
+  .karte button:hover{ background:var(--cd-primaer-80); }
+  .karte button:focus-visible{ outline:2px solid var(--cd-primaer-60); outline-offset:2px; }
+
+  /* Lektoratsmodus: alle Texte sichtbar machen */
+  body.lektorat .karte .detail{ display:block; }
+</style>
+</head>
+<body>
+
+<!-- Ab hier enthält das HTML keine Texte mehr: alles kommt aus TEXTE oben. -->
+<div class="wrap">
+  <header class="top">
+    <h1 data-key="titel"></h1>
+    <p data-key="intro"></p>
+  </header>
+  <section class="karten" id="karten"></section>
+</div>
+
+<script>
+  /* =====================================================================
+     GRAFIK-LOGIK (individuell für diese Grafik)
+     Jedes sichtbare Textelement bekommt data-key="…" (Pfad in TEXTE),
+     danach renderAll() aufrufen.
+     ===================================================================== */
+
+  // Lesbare Namen der Textstellen (für den Lektoratsmodus und das Werkzeug)
+  const LABELS = {
+    seitentitel:'Seitentitel', titel:'Titel', intro:'Einleitung', karteVon:'Zähler «Karte x von 3»',
+    mehr:'Button «Mehr»', weniger:'Button «Weniger»', karten:'Karte', text:'Text', detail:'Detail'
+  };
+
+  function el(tag, cls, key, n){
+    const e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(key) e.dataset.key = key;
+    if(n != null) e.dataset.n = n;
+    return e;
+  }
+
+  const box = document.getElementById('karten');
+  T.karten.forEach((k, i) => {
+    const pfad = 'karten.' + i + '.';
+    const karte = el('article', 'karte');
+    const btn = el('button', null, 'mehr');
+    btn.type = 'button';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.addEventListener('click', () => {
+      const offen = karte.classList.toggle('offen');
+      btn.dataset.key = offen ? 'weniger' : 'mehr';
+      btn.setAttribute('aria-expanded', offen ? 'true' : 'false');
+      renderEl(btn);
+    });
+    karte.append(el('span', 'label', 'karteVon', i + 1), el('h2', null, pfad + 'titel'), el('p', null, pfad + 'text'), el('p', 'detail', pfad + 'detail'), btn);
+    box.append(karte);
+  });
+
+  renderAll();
+</script>
+
+<!-- BAUSTEIN:lektoratsmodus START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/lektoratsmodus.html -->
+<!-- =====================================================================
+     LEKTORATSMODUS
+     Ein- und ausschalten: zuerst in die Grafik klicken, dann Ctrl+Alt+L.
+     Korrekturen werden nicht gespeichert, sondern als Text kopiert und
+     als Kommentar im Rise Review eingefügt.
+     Benötigt aus dem Code: TEXTE, LANG, CODE_ID, LABELS, OVERRIDES,
+     baseText(), renderKey(), renderAll().
+     ===================================================================== -->
+<style>
+  body.lektorat [data-key]{ outline:1.5px dashed currentColor; outline-offset:2px; cursor:text; border-radius:2px; }
+  body.lektorat [data-key]:hover{ outline-style:solid; }
+  body.lektorat [data-key].lk-changed{ outline:2.5px solid #f0a500; background-image:linear-gradient(rgba(240,165,0,.18), rgba(240,165,0,.18)); }
+  .lk-ui[hidden], .lk-ui [hidden]{ display:none !important; }
+  .lk-ui, .lk-ui *{ box-sizing:border-box; font-family:var(--cd-schrift, system-ui, sans-serif); }
+  .lk-bar{ position:sticky; top:0; z-index:1000; background:#2b2430; color:#fff; padding:10px 14px; display:flex; flex-wrap:wrap; justify-content:center; text-align:center; gap:8px 10px; align-items:center; font-size:13.5px; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+  .lk-bar .lk-title{ font-weight:800; }
+  .lk-bar .lk-count{ background:#f0a500; color:#2b2430; font-weight:800; border-radius:999px; padding:1px 9px; }
+  .lk-bar .lk-hint{ flex-basis:100%; opacity:.8; font-size:12.5px; }
+  .lk-bar .lk-stand{ font-size:12.5px; font-weight:600; opacity:.85; border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:1px 9px; }
+  .lk-bar .lk-spacer{ flex-basis:100%; height:0; }
+  .lk-btn{ border:0; border-radius:4px; font:inherit; font-size:13px; font-weight:700; padding:7px 12px; cursor:pointer; background:#fff; color:#2b2430; }
+  .lk-btn.lk-primary{ background:#f0a500; color:#2b2430; }
+  .lk-btn.lk-ghost{ background:transparent; color:#fff; border:1px solid rgba(255,255,255,.5); }
+  .lk-btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .lk-btn:focus-visible{ outline:2px solid #f0a500; outline-offset:2px; }
+  .lk-out{ flex-basis:100%; max-width:760px; text-align:left; display:flex; flex-direction:column; gap:6px; }
+  .lk-out textarea{ width:100%; min-height:110px; font:12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; border-radius:4px; border:0; padding:8px; color:#2b2430; }
+  .lk-msg{ font-size:12.5px; font-weight:600; }
+  .lk-pop{ position:absolute; z-index:1001; background:#fff; color:#2b2430; border:2px solid #2b2430; border-radius:6px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.25); display:flex; flex-direction:column; gap:8px; font-size:13px; }
+  .lk-pop .lk-where{ font-weight:800; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:#7345a0; }
+  .lk-pop .lk-orig{ background:#f3f0f6; border-radius:4px; padding:6px 8px; }
+  .lk-pop .lk-orig b{ display:block; font-size:11.5px; color:#7345a0; }
+  .lk-pop textarea{ width:100%; min-height:64px; font:inherit; font-size:14px; line-height:1.4; border:1.5px solid #b9a2cf; border-radius:4px; padding:7px 8px; resize:vertical; }
+  .lk-pop textarea:focus{ outline:2px solid #7345a0; outline-offset:1px; }
+  .lk-pop .lk-err{ color:#b3261e; font-weight:700; }
+  .lk-pop .lk-row{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .lk-pop .lk-btn{ background:#ececec; }
+  .lk-pop .lk-btn.lk-primary{ background:#501688; color:#fff; }
+</style>
+<script>
+(function(){
+  const UI = {
+    de:{ stand:'Stand', mode:'Lektoratsmodus', lang:'Deutsch', count:n => n + (n === 1 ? ' Änderung' : ' Änderungen'),
+         hint:'Auf einen markierten Text klicken, um ihn zu korrigieren. Zum Schluss «Änderungen kopieren» und den Text als Kommentar einfügen.',
+         copy:'Änderungen kopieren', discard:'Alle verwerfen', discardSure:'Wirklich alle verwerfen?', exit:'Beenden',
+         original:'Original (Deutsch)', apply:'Übernehmen', cancel:'Abbrechen', reset:'Original wiederherstellen',
+         copied:'Kopiert. Jetzt als Kommentar im Rise Review einfügen.',
+         manual:'Automatisches Kopieren nicht möglich: Text unten markieren (Ctrl+A) und kopieren (Ctrl+C).',
+         placeholder:'Der Platzhalter {n} muss genau einmal im Text stehen (dort erscheint die Nummer).',
+         empty:'Der Text darf nicht leer sein.' },
+    fr:{ stand:'Version du', mode:'Mode relecture', lang:'Français', count:n => n + (n === 1 ? ' modification' : ' modifications'),
+         hint:'Cliquez sur un texte marqué pour le corriger. Pour terminer, cliquez sur « Copier les modifications » et collez le texte dans un commentaire.',
+         copy:'Copier les modifications', discard:'Tout annuler', discardSure:'Vraiment tout annuler ?', exit:'Quitter',
+         original:'Original (allemand)', apply:'Valider', cancel:'Annuler', reset:'Rétablir l’original',
+         copied:'Copié. Collez maintenant le texte dans un commentaire de Rise Review.',
+         manual:'Copie automatique impossible : sélectionnez le texte ci-dessous (Ctrl+A) et copiez-le (Ctrl+C).',
+         placeholder:'L’espace réservé {n} doit figurer une fois dans le texte (le numéro s’y affichera).',
+         empty:'Le texte ne peut pas être vide.' },
+    it:{ stand:'Versione del', mode:'Modalità revisione', lang:'Italiano', count:n => n + (n === 1 ? ' modifica' : ' modifiche'),
+         hint:'Clicchi su un testo evidenziato per correggerlo. Alla fine clicchi su «Copia le modifiche» e incolli il testo in un commento.',
+         copy:'Copia le modifiche', discard:'Annulla tutto', discardSure:'Annullare davvero tutto?', exit:'Esci',
+         original:'Originale (tedesco)', apply:'Conferma', cancel:'Annulla', reset:'Ripristina l’originale',
+         copied:'Copiato. Ora incolli il testo in un commento di Rise Review.',
+         manual:'Copia automatica non possibile: selezioni il testo qui sotto (Ctrl+A) e lo copi (Ctrl+C).',
+         placeholder:'Il segnaposto {n} deve comparire una volta nel testo (lì apparirà il numero).',
+         empty:'Il testo non può essere vuoto.' },
+    en:{ stand:'Version', mode:'Proofreading mode', lang:'English', count:n => n + (n === 1 ? ' change' : ' changes'),
+         hint:'Click on a marked text to correct it. When you have finished, click “Copy changes” and paste the text into a comment.',
+         copy:'Copy changes', discard:'Discard all', discardSure:'Really discard all?', exit:'Exit',
+         original:'Original (German)', apply:'Apply', cancel:'Cancel', reset:'Restore original',
+         copied:'Copied. Now paste it into a comment in Rise Review.',
+         manual:'Automatic copying is not possible: select the text below (Ctrl+A) and copy it (Ctrl+C).',
+         placeholder:'The placeholder {n} must appear exactly once in the text (the number will appear there).',
+         empty:'The text cannot be empty.' }
+  };
+  const U = UI[LANG] || UI.de;
+  const STORE = 'lektorat:' + CODE_ID + ':' + LANG;
+  let on = false, bar = null, pop = null;
+  let changes = {};   // key -> { alt, neu }
+
+  function load(){
+    try{
+      const s = JSON.parse(localStorage.getItem(STORE) || '{}');
+      Object.keys(s).forEach(k => { if(s[k] && s[k].alt === baseText(k)) changes[k] = s[k]; });
+    }catch(e){}
+  }
+  function save(){ try{ localStorage.setItem(STORE, JSON.stringify(changes)); }catch(e){} }
+
+  function label(key){
+    const L = typeof LABELS !== 'undefined' ? LABELS : {};
+    const path = key.split('.');
+    const parts = [];
+    path.forEach((seg, i) => {
+      if(/^\d+$/.test(seg)){
+        const n = Number(seg);
+        if(i > 0 && /^\d+$/.test(path[i-1])) parts.push(['links', 'rechts'][n] || 'Spalte ' + (n + 1));
+        else if(parts.length) parts[parts.length - 1] += ' ' + (n + 1);
+      } else parts.push(L[seg] || seg);
+    });
+    return parts.join(' › ');
+  }
+
+  function placeholders(t){ return (t.match(/\{\w+\}/g) || []).sort().join(); }
+
+  function mark(){
+    document.querySelectorAll('[data-key]').forEach(e => e.classList.toggle('lk-changed', on && e.dataset.key in changes));
+    if(bar) bar.querySelector('.lk-count').textContent = U.count(Object.keys(changes).length);
+    if(bar) bar.querySelector('[data-act="copy"]').disabled = !Object.keys(changes).length;
+  }
+
+  function button(text, cls, act){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'lk-btn ' + (cls || ''); b.textContent = text; b.dataset.act = act;
+    return b;
+  }
+
+  /* ---------- Leiste oben ---------- */
+  function buildBar(){
+    bar = document.createElement('div');
+    bar.className = 'lk-ui lk-bar';
+    const title = document.createElement('span'); title.className = 'lk-title'; title.textContent = U.mode + ' · ' + U.lang;
+    const count = document.createElement('span'); count.className = 'lk-count';
+    const stand = document.createElement('span'); stand.className = 'lk-stand';
+    stand.textContent = U.stand + ' ' + (typeof STAND !== 'undefined' && STAND ? STAND : '–');
+    const spacer = document.createElement('span'); spacer.className = 'lk-spacer';
+    const hint = document.createElement('span'); hint.className = 'lk-hint'; hint.textContent = U.hint;
+    const out = document.createElement('div'); out.className = 'lk-out'; out.hidden = true;
+    bar.append(title, count, stand, spacer, button(U.copy, 'lk-primary', 'copy'), button(U.discard, 'lk-ghost', 'discard'), button(U.exit, 'lk-ghost', 'exit'), hint, out);
+    bar.addEventListener('click', e => {
+      const act = e.target.dataset && e.target.dataset.act;
+      if(act === 'copy') copyChanges();
+      if(act === 'exit') toggle(false);
+      if(act === 'discard'){
+        const b = e.target;
+        if(b.dataset.sure){ changes = {}; save(); applyAll(); b.textContent = U.discard; delete b.dataset.sure; out.hidden = true; }
+        else { b.textContent = U.discardSure; b.dataset.sure = '1'; setTimeout(() => { b.textContent = U.discard; delete b.dataset.sure; }, 4000); }
+      }
+    });
+    document.body.prepend(bar);
+  }
+
+  function output(){
+    const lines = ['[[Lektorat ' + CODE_ID + ' ' + LANG + ']]'];
+    Object.keys(changes).forEach(k => lines.push('[[' + k + ' | ' + label(k) + ']] ' + changes[k].neu));
+    return lines.join('\n');
+  }
+
+  function copyChanges(){
+    const out = bar.querySelector('.lk-out');
+    out.innerHTML = '';
+    const msg = document.createElement('span'); msg.className = 'lk-msg';
+    const ta = document.createElement('textarea'); ta.readOnly = true; ta.value = output();
+    out.append(msg, ta); out.hidden = false;
+    const fallback = () => {
+      ta.focus(); ta.select();
+      let ok = false;
+      try{ ok = document.execCommand('copy'); }catch(e){}
+      msg.textContent = ok ? U.copied : U.manual;
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ta.value).then(() => { msg.textContent = U.copied; ta.select(); }, fallback);
+    } else fallback();
+  }
+
+  /* ---------- Bearbeitungsfenster ---------- */
+  function closePop(restore){
+    if(!pop) return;
+    if(restore){
+      const k = pop.dataset.lkKey;
+      if(k in changes) OVERRIDES[k] = changes[k].neu; else delete OVERRIDES[k];
+      renderKey(k);
+    }
+    pop.remove(); pop = null;
+  }
+
+  function openPop(target){
+    closePop(true);
+    const key = target.dataset.key;
+    const base = baseText(key);
+    pop = document.createElement('div');
+    pop.className = 'lk-ui lk-pop';
+    pop.dataset.lkKey = key;
+
+    const where = document.createElement('span'); where.className = 'lk-where'; where.textContent = label(key);
+    pop.append(where);
+
+    if(LANG !== 'de'){
+      const orig = document.createElement('div'); orig.className = 'lk-orig';
+      const b = document.createElement('b'); b.textContent = U.original;
+      orig.append(b, document.createTextNode(getAtDe(key)));
+      pop.append(orig);
+    }
+
+    const ta = document.createElement('textarea');
+    ta.value = rawTextOf(key);
+    const err = document.createElement('span'); err.className = 'lk-err';
+    const row = document.createElement('div'); row.className = 'lk-row';
+    const bReset = button(U.reset, '', 'reset');
+    const bCancel = button(U.cancel, '', 'cancel');
+    const bApply = button(U.apply, 'lk-primary', 'apply');
+    row.append(bReset, bCancel, bApply);
+    pop.append(ta, err, row);
+
+    function check(){
+      const v = ta.value.replace(/\s*\n\s*/g, ' ');
+      let problem = '';
+      if(!v.trim()) problem = U.empty;
+      else if(placeholders(v) !== placeholders(base)) problem = U.placeholder;
+      err.textContent = problem;
+      bApply.disabled = !!problem;
+      return problem ? null : v.trim();
+    }
+    ta.addEventListener('input', () => {
+      const v = check();
+      if(v !== null){ OVERRIDES[key] = v; renderKey(key); }
+    });
+    ta.addEventListener('keydown', e => {
+      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); if(!bApply.disabled) bApply.click(); }
+      if(e.key === 'Escape'){ e.preventDefault(); closePop(true); }
+    });
+    bCancel.addEventListener('click', () => closePop(true));
+    bReset.addEventListener('click', () => { ta.value = base; ta.dispatchEvent(new Event('input')); ta.focus(); });
+    bApply.addEventListener('click', () => {
+      const v = check();
+      if(v === null) return;
+      if(v === base){ delete changes[key]; delete OVERRIDES[key]; }
+      else { changes[key] = { alt:base, neu:v }; OVERRIDES[key] = v; }
+      save(); renderKey(key); closePop(false); mark();
+    });
+    check();
+
+    document.body.append(pop);
+    const r = target.getBoundingClientRect();
+    const w = Math.min(440, window.innerWidth - 16);
+    pop.style.width = w + 'px';
+    pop.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - w - 8)) + 'px';
+    pop.style.top = (r.bottom + window.scrollY + 8) + 'px';
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
+  function rawTextOf(key){ return key in changes ? changes[key].neu : baseText(key); }
+  function getAtDe(key){
+    const v = key.split('.').reduce((o, s) => (o == null ? undefined : o[/^\d+$/.test(s) ? Number(s) : s]), TEXTE.de);
+    return typeof v === 'string' ? v : '';
+  }
+
+  /* ---------- Ein / Aus ---------- */
+  function applyAll(){
+    Object.keys(OVERRIDES).forEach(k => delete OVERRIDES[k]);
+    if(on) Object.keys(changes).forEach(k => { OVERRIDES[k] = changes[k].neu; });
+    renderAll(); mark();
+  }
+
+  function toggle(state){
+    on = state === undefined ? !on : state;
+    document.body.classList.toggle('lektorat', on);
+    closePop(false);
+    if(on){ load(); if(!bar) buildBar(); bar.hidden = false; }
+    else if(bar){ bar.hidden = true; }
+    applyAll();
+  }
+
+  document.addEventListener('keydown', e => {
+    if(e.ctrlKey && e.altKey && e.code === 'KeyL'){ e.preventDefault(); toggle(); }
+  }, true);
+
+  // Im Lektoratsmodus: Klicks öffnen das Bearbeitungsfenster statt die Grafik zu bedienen
+  document.addEventListener('click', e => {
+    if(!on || e.target.closest('.lk-ui')) return;
+    e.preventDefault(); e.stopPropagation();
+    const t = e.target.closest('[data-key]');
+    if(t) openPop(t); else closePop(true);
+  }, true);
+})();
+</script>
+<!-- BAUSTEIN:lektoratsmodus ENDE -->
+
+</body>
+</html>

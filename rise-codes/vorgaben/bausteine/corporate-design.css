@@ -1,0 +1,36 @@
+  /* BAUSTEIN:corporate-design START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/corporate-design.css */
+  @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
+
+  :root{
+    /* ---------- Farben ---------- */
+    --cd-primaer:#501688;        /* Hauptfarbe: Titel, Buttons, dunkle Flächen */
+    --cd-primaer-80:#7345a0;     /* Untertitel, Hinweise, Hover */
+    --cd-primaer-60:#9673b8;     /* mittlere Flächen */
+    --cd-primaer-30:#b9a2cf;     /* helle Flächen, Akzente */
+    --cd-primaer-10:#dcd0e7;     /* sehr helle Flächen */
+    --cd-hintergrund:#ececec;    /* Seitenhintergrund, Zeilen */
+    --cd-flaeche:#ffffff;        /* Karten, Panels */
+    --cd-text:#2b2430;           /* Fliesstext */
+    --cd-text-hell:#ffffff;      /* Text auf dunklen Flächen */
+    --cd-linie:#dcd0e7;          /* Rahmen, Trennlinien */
+
+    /* ---------- Schrift ---------- */
+    --cd-schrift:'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --cd-gewicht-normal:400;
+    --cd-gewicht-mittel:600;
+    --cd-gewicht-fett:700;
+    --cd-gewicht-extra:800;
+
+    /* ---------- Textgrössen ---------- */
+    --cd-titel:clamp(26px, 4.6vw, 40px);         /* Haupttitel der Grafik */
+    --cd-untertitel:clamp(14px, 2.4vw, 17px);    /* Einleitung unter dem Titel */
+    --cd-zwischentitel:clamp(16px, 2.2vw, 19px); /* Titel von Karten, Stufen, Fragen */
+    --cd-text-gross:16px;                        /* hervorgehobener Text */
+    --cd-text-normal:14px;                       /* Fliesstext */
+    --cd-text-klein:13px;                        /* Tabellen, Buttons, Zusatzinfos */
+    --cd-label:12px;                             /* kleine Labels, oft in Grossbuchstaben */
+
+    /* ---------- Formen ---------- */
+    --cd-radius:4px;                             /* Eckenrundung */
+  }
+  /* BAUSTEIN:corporate-design ENDE */

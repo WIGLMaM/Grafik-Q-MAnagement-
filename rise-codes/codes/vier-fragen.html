@@ -6,8 +6,8 @@
 <title>Vier Fragen</title>
 
 <!-- =====================================================================
-     SPRACHE EINSTELLEN
-     In der jeweiligen Rise-Sprachkopie NUR diese eine Zeile ändern:
+     EINSTELLUNGEN
+     In der jeweiligen Rise-Sprachkopie NUR die Zeile SPRACHE ändern:
        'de' = Deutsch   'fr' = Français (CH)   'it' = Italiano (CH)   'en' = English (UK)
      ===================================================================== -->
 <script>
@@ -280,29 +280,117 @@ const TEXTE = {
 };
 </script>
 
+<!-- BAUSTEIN:sprachsystem START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/sprachsystem.html -->
+<script>
+  /* Sprache wählen (zum Testen auch über ?lang=fr in der Adresse) */
+  const urlLang = new URLSearchParams(location.search).get('lang');
+  const LANG = TEXTE[urlLang] ? urlLang : (TEXTE[SPRACHE] ? SPRACHE : 'de');
+  const T = TEXTE[LANG];
+  const OVERRIDES = {};   // vorläufige Korrekturen aus dem Lektoratsmodus
+
+  function pathOf(key){ return key.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s); }
+  function getAt(obj, path){ return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+
+  /* Text aus TEXTE (ohne Korrekturen); fehlt er in der Sprache, gilt der deutsche */
+  function baseText(key){
+    const p = pathOf(key);
+    const v = getAt(T, p);
+    if(typeof v === 'string') return v;
+    const d = getAt(TEXTE.de, p);
+    return typeof d === 'string' ? d : '';
+  }
+  function rawText(key){ return key in OVERRIDES ? OVERRIDES[key] : baseText(key); }
+
+  /* Französisch: geschützte Leerzeichen vor ? ! ; (schmal) und vor : % (normal) */
+  function fein(text){
+    if(LANG !== 'fr') return text;
+    return text.replace(/ ([?!;])/g, ' $1').replace(/ ([:%])/g, ' $1');
+  }
+
+  /* Elemente mit data-key="…" zeigen den Text; data-n="…" ersetzt {n}.
+     Attribute: data-key-aria-label, data-key-alt, data-key-title, data-key-placeholder */
+  const ATTR_KEYS = ['aria-label', 'alt', 'title', 'placeholder'];
+  function renderEl(e){
+    if(e.dataset.key){
+      let t = rawText(e.dataset.key);
+      if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
+      e.textContent = fein(t);
+    }
+    ATTR_KEYS.forEach(a => {
+      const k = e.getAttribute('data-key-' + a);
+      if(k){
+        let t = rawText(k);
+        if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
+        e.setAttribute(a, fein(t));
+      }
+    });
+  }
+  function renderKey(key){
+    document.querySelectorAll('[data-key="' + key + '"]').forEach(renderEl);
+    ATTR_KEYS.forEach(a => document.querySelectorAll('[data-key-' + a + '="' + key + '"]').forEach(renderEl));
+  }
+  function renderAll(){
+    document.querySelectorAll('[data-key],' + ATTR_KEYS.map(a => '[data-key-' + a + ']').join(',')).forEach(renderEl);
+  }
+
+  document.documentElement.lang = { de:'de-CH', fr:'fr-CH', it:'it-CH', en:'en-GB' }[LANG] || LANG;
+  document.title = baseText('seitentitel');
+</script>
+<!-- BAUSTEIN:sprachsystem ENDE -->
+
 <style>
+  /* BAUSTEIN:corporate-design START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/corporate-design.css */
   @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
 
   :root{
-    --purple-950:#501688;
-    --purple-800:#7345a0;
-    --purple-600:#9673b8;
-    --purple-300:#b9a2cf;
-    --purple-100:#dcd0e7;
-    --neutral:#ececec;
-    --ink:#2b2430;
-    --line:#dcd0e7;
-    --radius:4px;
-    --indent:72px;
+    /* ---------- Farben ---------- */
+    --cd-primaer:#501688;        /* Hauptfarbe: Titel, Buttons, dunkle Flächen */
+    --cd-primaer-80:#7345a0;     /* Untertitel, Hinweise, Hover */
+    --cd-primaer-60:#9673b8;     /* mittlere Flächen */
+    --cd-primaer-30:#b9a2cf;     /* helle Flächen, Akzente */
+    --cd-primaer-10:#dcd0e7;     /* sehr helle Flächen */
+    --cd-hintergrund:#ececec;    /* Seitenhintergrund, Zeilen */
+    --cd-flaeche:#ffffff;        /* Karten, Panels */
+    --cd-text:#2b2430;           /* Fliesstext */
+    --cd-text-hell:#ffffff;      /* Text auf dunklen Flächen */
+    --cd-linie:#dcd0e7;          /* Rahmen, Trennlinien */
+
+    /* ---------- Schrift ---------- */
+    --cd-schrift:'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --cd-gewicht-normal:400;
+    --cd-gewicht-mittel:600;
+    --cd-gewicht-fett:700;
+    --cd-gewicht-extra:800;
+
+    /* ---------- Textgrössen ---------- */
+    --cd-titel:clamp(26px, 4.6vw, 40px);         /* Haupttitel der Grafik */
+    --cd-untertitel:clamp(14px, 2.4vw, 17px);    /* Einleitung unter dem Titel */
+    --cd-zwischentitel:clamp(16px, 2.2vw, 19px); /* Titel von Karten, Stufen, Fragen */
+    --cd-text-gross:16px;                        /* hervorgehobener Text */
+    --cd-text-normal:14px;                       /* Fliesstext */
+    --cd-text-klein:13px;                        /* Tabellen, Buttons, Zusatzinfos */
+    --cd-label:12px;                             /* kleine Labels, oft in Grossbuchstaben */
+
+    /* ---------- Formen ---------- */
+    --cd-radius:4px;                             /* Eckenrundung */
   }
+  /* BAUSTEIN:corporate-design ENDE */
+
+  /* =====================================================================
+     GRAFIK-DESIGN (individuell für diese Grafik)
+     Nur Farben, Schriften und Grössen aus dem Corporate Design verwenden: var(--cd-…)
+     ===================================================================== */
+
+
+  :root{ --indent:72px; }   /* Einrückung der Treppe */
 
   *{box-sizing:border-box;}
 
   body{
     margin:0;
-    font-family:'Open Sans', system-ui, sans-serif;
-    color:var(--ink);
-    background:var(--neutral);
+    font-family:var(--cd-schrift);
+    color:var(--cd-text);
+    background:var(--cd-hintergrund);
     -webkit-font-smoothing:antialiased;
   }
 
@@ -318,32 +406,32 @@ const TEXTE = {
   }
 
   header.top h1{
-    font-weight:800;
-    font-size:clamp(26px, 4.6vw, 40px);
-    color:var(--purple-950);
+    font-weight:var(--cd-gewicht-extra);
+    font-size:var(--cd-titel);
+    color:var(--cd-primaer);
     margin:0 0 6px;
     letter-spacing:-0.01em;
   }
 
   header.top p{
-    font-size:clamp(14px, 2.4vw, 17px);
-    color:var(--purple-800);
+    font-size:var(--cd-untertitel);
+    color:var(--cd-primaer-80);
     margin:0;
-    font-weight:600;
+    font-weight:var(--cd-gewicht-mittel);
     line-height:1.5;
   }
 
   .panel{
-    background:#fff;
-    border:1.5px solid var(--line);
-    border-radius:var(--radius);
+    background:var(--cd-flaeche);
+    border:1.5px solid var(--cd-linie);
+    border-radius:var(--cd-radius);
     padding:24px 24px 28px;
   }
 
   .instruction{
-    font-size:14px;
-    font-weight:600;
-    color:var(--purple-800);
+    font-size:var(--cd-text-normal);
+    font-weight:var(--cd-gewicht-mittel);
+    color:var(--cd-primaer-80);
     margin:0 0 18px;
     line-height:1.5;
   }
@@ -365,9 +453,9 @@ const TEXTE = {
   }
 
   .glass-top .start{
-    font-size:12.5px;
-    font-weight:700;
-    color:var(--purple-800);
+    font-size:var(--cd-label);
+    font-weight:var(--cd-gewicht-fett);
+    color:var(--cd-primaer-80);
     padding-bottom:8px;
   }
 
@@ -379,14 +467,14 @@ const TEXTE = {
   }
 
   .step{
-    border-radius:var(--radius) var(--radius) 0 0;
+    border-radius:var(--cd-radius) var(--cd-radius) 0 0;
     position:relative;
   }
 
-  .step[data-step="1"]{ margin-left:0;                        background:var(--purple-100); color:var(--purple-950); }
-  .step[data-step="2"]{ margin-left:calc(var(--indent) * 1);  background:var(--purple-300); color:var(--purple-950); }
-  .step[data-step="3"]{ margin-left:calc(var(--indent) * 2);  background:var(--purple-600); color:#fff; }
-  .step[data-step="4"]{ margin-left:calc(var(--indent) * 3);  background:var(--purple-800); color:#fff; }
+  .step[data-step="1"]{ margin-left:0;                        background:var(--cd-primaer-10); color:var(--cd-primaer); }
+  .step[data-step="2"]{ margin-left:calc(var(--indent) * 1);  background:var(--cd-primaer-30); color:var(--cd-primaer); }
+  .step[data-step="3"]{ margin-left:calc(var(--indent) * 2);  background:var(--cd-primaer-60); color:var(--cd-text-hell); }
+  .step[data-step="4"]{ margin-left:calc(var(--indent) * 3);  background:var(--cd-primaer-80); color:var(--cd-text-hell); }
 
   .step-head{
     width:100%;
@@ -403,12 +491,12 @@ const TEXTE = {
   }
 
   .step-head:focus-visible{
-    outline:2px solid var(--purple-950);
+    outline:2px solid var(--cd-primaer);
     outline-offset:-4px;
   }
 
   .step[data-step="3"] .step-head:focus-visible,
-  .step[data-step="4"] .step-head:focus-visible{ outline-color:#fff; }
+  .step[data-step="4"] .step-head:focus-visible{ outline-color:var(--cd-text-hell); }
 
   .num{
     flex:none;
@@ -418,14 +506,14 @@ const TEXTE = {
     display:flex;
     align-items:center;
     justify-content:center;
-    font-weight:800;
-    font-size:16px;
-    background:var(--purple-950);
-    color:#fff;
+    font-weight:var(--cd-gewicht-extra);
+    font-size:var(--cd-text-gross);
+    background:var(--cd-primaer);
+    color:var(--cd-text-hell);
   }
 
   .step[data-step="3"] .num,
-  .step[data-step="4"] .num{ background:#fff; color:var(--purple-950); }
+  .step[data-step="4"] .num{ background:var(--cd-flaeche); color:var(--cd-primaer); }
 
   .head-text{
     flex:1;
@@ -436,22 +524,22 @@ const TEXTE = {
   }
 
   .kicker{
-    font-size:11.5px;
-    font-weight:700;
+    font-size:var(--cd-label);
+    font-weight:var(--cd-gewicht-fett);
     letter-spacing:.07em;
     text-transform:uppercase;
     opacity:.8;
   }
 
   .question{
-    font-size:clamp(16px, 2.2vw, 19px);
-    font-weight:800;
+    font-size:var(--cd-zwischentitel);
+    font-weight:var(--cd-gewicht-extra);
     line-height:1.25;
   }
 
   .word{
-    font-size:13px;
-    font-weight:600;
+    font-size:var(--cd-text-klein);
+    font-weight:var(--cd-gewicht-mittel);
     opacity:.85;
   }
 
@@ -478,10 +566,10 @@ const TEXTE = {
 
   .content{
     margin:0 18px 18px;
-    background:#fff;
-    border-radius:var(--radius);
+    background:var(--cd-flaeche);
+    border-radius:var(--cd-radius);
     padding:14px;
-    color:var(--ink);
+    color:var(--cd-text);
   }
 
   .rows{
@@ -497,16 +585,16 @@ const TEXTE = {
     display:grid;
     grid-template-columns:minmax(120px, 38%) 1fr;
     gap:12px;
-    background:var(--neutral);
-    border-radius:var(--radius);
+    background:var(--cd-hintergrund);
+    border-radius:var(--cd-radius);
     padding:8px 10px;
-    font-size:13.5px;
+    font-size:var(--cd-text-klein);
     line-height:1.4;
   }
 
   .rows .sign{
-    font-weight:700;
-    color:var(--purple-950);
+    font-weight:var(--cd-gewicht-fett);
+    color:var(--cd-primaer);
   }
 
   .content-foot{
@@ -519,27 +607,27 @@ const TEXTE = {
   }
 
   .essence{
-    font-size:14px;
-    font-weight:700;
-    color:var(--purple-800);
+    font-size:var(--cd-text-normal);
+    font-weight:var(--cd-gewicht-fett);
+    color:var(--cd-primaer-80);
   }
 
   .next{
     border:0;
-    border-radius:var(--radius);
-    background:var(--purple-950);
-    color:#fff;
+    border-radius:var(--cd-radius);
+    background:var(--cd-primaer);
+    color:var(--cd-text-hell);
     font:inherit;
-    font-size:13px;
-    font-weight:700;
+    font-size:var(--cd-text-klein);
+    font-weight:var(--cd-gewicht-fett);
     padding:8px 14px;
     cursor:pointer;
   }
 
-  .next:hover{ background:var(--purple-800); }
+  .next:hover{ background:var(--cd-primaer-80); }
 
   .next:focus-visible{
-    outline:2px solid var(--purple-600);
+    outline:2px solid var(--cd-primaer-60);
     outline-offset:2px;
   }
 
@@ -547,9 +635,9 @@ const TEXTE = {
 
   .cellar{
     margin-left:calc(var(--indent) * 4);
-    background:var(--purple-950);
-    color:#fff;
-    border-radius:var(--radius) var(--radius) 0 0;
+    background:var(--cd-primaer);
+    color:var(--cd-text-hell);
+    border-radius:var(--cd-radius) var(--cd-radius) 0 0;
     padding:16px 18px;
     display:flex;
     align-items:center;
@@ -557,7 +645,7 @@ const TEXTE = {
     transition:box-shadow .2s ease;
   }
 
-  .cellar.reached{ box-shadow:inset 0 0 0 3px var(--purple-300); }
+  .cellar.reached{ box-shadow:inset 0 0 0 3px var(--cd-primaer-30); }
 
   .cellar svg{
     flex:none;
@@ -567,20 +655,20 @@ const TEXTE = {
 
   .cellar strong{
     display:block;
-    font-size:16px;
-    font-weight:800;
+    font-size:var(--cd-text-gross);
+    font-weight:var(--cd-gewicht-extra);
   }
 
   .cellar span{
-    font-size:13px;
-    font-weight:600;
+    font-size:var(--cd-text-klein);
+    font-weight:var(--cd-gewicht-mittel);
     opacity:.85;
   }
 
   .floor{
     height:6px;
-    background:var(--purple-950);
-    border-radius:0 0 var(--radius) var(--radius);
+    background:var(--cd-primaer);
+    border-radius:0 0 var(--cd-radius) var(--cd-radius);
   }
 
   /* ---------- Lektoratsmodus: alle Stufen offen ---------- */
@@ -603,6 +691,7 @@ const TEXTE = {
 </head>
 <body>
 
+
 <!-- Ab hier enthält das HTML keine Texte mehr: alles kommt aus TEXTE oben. -->
 <div class="wrap">
 
@@ -616,13 +705,13 @@ const TEXTE = {
     <p class="instruction" data-key="anleitung"></p>
 
     <div class="glass-top" aria-hidden="true">
-      <svg viewBox="0 0 140 110" fill="none" stroke="#501688" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M24 34 Q22 58 40 64 Q58 58 56 34" fill="#b9a2cf" stroke="none"/>
+      <svg viewBox="0 0 140 110" fill="none" style="stroke:var(--cd-primaer)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M24 34 Q22 58 40 64 Q58 58 56 34" stroke="none" style="fill:var(--cd-primaer-30)"/>
         <path d="M18 8 H62 Q66 54 40 64 Q14 54 18 8 Z"/>
         <path d="M20 34 H60"/>
         <path d="M40 64 V100"/>
         <path d="M26 104 H54"/>
-        <path d="M84 34 Q82 58 100 64 Q118 58 116 34" fill="#501688" stroke="none"/>
+        <path d="M84 34 Q82 58 100 64 Q118 58 116 34" stroke="none" style="fill:var(--cd-primaer)"/>
         <path d="M78 8 H122 Q126 54 100 64 Q74 54 78 8 Z"/>
         <path d="M80 34 H120"/>
         <path d="M100 64 V100"/>
@@ -637,7 +726,7 @@ const TEXTE = {
 
       <!-- Keller -->
       <div class="cellar" id="cellar">
-        <svg viewBox="0 0 60 50" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <svg viewBox="0 0 60 50" fill="none" style="stroke:var(--cd-text-hell)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <ellipse cx="12" cy="25" rx="7" ry="20"/>
           <path d="M12 5 H46"/>
           <path d="M12 45 H46"/>
@@ -660,13 +749,10 @@ const TEXTE = {
 
 <script>
   /* =====================================================================
-     TEXTE ANZEIGEN
-     Jedes Element mit data-key="…" zeigt den passenden Text aus TEXTE.
+     GRAFIK-LOGIK (individuell für diese Grafik)
+     Jedes sichtbare Textelement bekommt data-key="…" (Pfad in TEXTE),
+     danach renderAll() aufrufen.
      ===================================================================== */
-  const urlLang = new URLSearchParams(location.search).get('lang');
-  const LANG = TEXTE[urlLang] ? urlLang : (TEXTE[SPRACHE] ? SPRACHE : 'de');
-  const T = TEXTE[LANG];
-  const OVERRIDES = {};   // vorläufige Korrekturen aus dem Lektoratsmodus
 
   // Lesbare Namen der Textstellen (für den Lektoratsmodus und das Werkzeug)
   const LABELS = {
@@ -675,36 +761,6 @@ const TEXTE = {
     zumKeller:'Button «Keller»', fragen:'Frage', zeilen:'Zeile', frage:'Fragetext', stichwort:'Stichwort',
     fazit:'Fazit', kellerTitel:'Keller: Titel', kellerText:'Keller: Text'
   };
-
-  function pathOf(key){ return key.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s); }
-  function getAt(obj, path){ return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
-
-  // Text aus TEXTE (ohne Korrekturen); fehlt er in der Sprache, gilt der deutsche
-  function baseText(key){
-    const p = pathOf(key);
-    const v = getAt(T, p);
-    if(typeof v === 'string') return v;
-    const d = getAt(TEXTE.de, p);
-    return typeof d === 'string' ? d : '';
-  }
-  function rawText(key){ return key in OVERRIDES ? OVERRIDES[key] : baseText(key); }
-
-  // Französisch: geschützte Leerzeichen vor ? ! ; (schmal) und vor : % (normal)
-  function fein(text){
-    if(LANG !== 'fr') return text;
-    return text.replace(/ ([?!;])/g, ' $1').replace(/ ([:%])/g, ' $1');
-  }
-
-  function renderEl(e){
-    let t = rawText(e.dataset.key);
-    if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
-    e.textContent = fein(t);
-  }
-  function renderKey(key){ document.querySelectorAll('[data-key="' + key + '"]').forEach(renderEl); }
-  function renderAll(){ document.querySelectorAll('[data-key]').forEach(renderEl); }
-
-  document.documentElement.lang = { de:'de-CH', fr:'fr-CH', it:'it-CH', en:'en-GB' }[LANG];
-  document.title = baseText('seitentitel');
 
   /* ---------- Stufen aufbauen ---------- */
   const stairs = document.getElementById('stairs');
@@ -808,8 +864,9 @@ const TEXTE = {
   });
 </script>
 
+<!-- BAUSTEIN:lektoratsmodus START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/lektoratsmodus.html -->
 <!-- =====================================================================
-     LEKTORATSMODUS (Baustein, in allen Codes gleich – nicht ändern)
+     LEKTORATSMODUS
      Ein- und ausschalten: zuerst in die Grafik klicken, dann Ctrl+Alt+L.
      Korrekturen werden nicht gespeichert, sondern als Text kopiert und
      als Kommentar im Rise Review eingefügt.
@@ -821,7 +878,7 @@ const TEXTE = {
   body.lektorat [data-key]:hover{ outline-style:solid; }
   body.lektorat [data-key].lk-changed{ outline:2.5px solid #f0a500; background-image:linear-gradient(rgba(240,165,0,.18), rgba(240,165,0,.18)); }
   .lk-ui[hidden], .lk-ui [hidden]{ display:none !important; }
-  .lk-ui, .lk-ui *{ box-sizing:border-box; font-family:'Open Sans', system-ui, sans-serif; }
+  .lk-ui, .lk-ui *{ box-sizing:border-box; font-family:var(--cd-schrift, system-ui, sans-serif); }
   .lk-bar{ position:sticky; top:0; z-index:1000; background:#2b2430; color:#fff; padding:10px 14px; display:flex; flex-wrap:wrap; justify-content:center; text-align:center; gap:8px 10px; align-items:center; font-size:13.5px; box-shadow:0 2px 8px rgba(0,0,0,.25); }
   .lk-bar .lk-title{ font-weight:800; }
   .lk-bar .lk-count{ background:#f0a500; color:#2b2430; font-weight:800; border-radius:999px; padding:1px 9px; }
@@ -1084,6 +1141,7 @@ const TEXTE = {
   }, true);
 })();
 </script>
+<!-- BAUSTEIN:lektoratsmodus ENDE -->
 
 </body>
 </html>

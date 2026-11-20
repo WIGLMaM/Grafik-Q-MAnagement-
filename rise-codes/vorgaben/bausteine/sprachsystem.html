@@ -1,0 +1,57 @@
+<!-- BAUSTEIN:sprachsystem START · nicht im Code ändern, Quelle: rise-codes/vorgaben/bausteine/sprachsystem.html -->
+<script>
+  /* Sprache wählen (zum Testen auch über ?lang=fr in der Adresse) */
+  const urlLang = new URLSearchParams(location.search).get('lang');
+  const LANG = TEXTE[urlLang] ? urlLang : (TEXTE[SPRACHE] ? SPRACHE : 'de');
+  const T = TEXTE[LANG];
+  const OVERRIDES = {};   // vorläufige Korrekturen aus dem Lektoratsmodus
+
+  function pathOf(key){ return key.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s); }
+  function getAt(obj, path){ return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+
+  /* Text aus TEXTE (ohne Korrekturen); fehlt er in der Sprache, gilt der deutsche */
+  function baseText(key){
+    const p = pathOf(key);
+    const v = getAt(T, p);
+    if(typeof v === 'string') return v;
+    const d = getAt(TEXTE.de, p);
+    return typeof d === 'string' ? d : '';
+  }
+  function rawText(key){ return key in OVERRIDES ? OVERRIDES[key] : baseText(key); }
+
+  /* Französisch: geschützte Leerzeichen vor ? ! ; (schmal) und vor : % (normal) */
+  function fein(text){
+    if(LANG !== 'fr') return text;
+    return text.replace(/ ([?!;])/g, ' $1').replace(/ ([:%])/g, ' $1');
+  }
+
+  /* Elemente mit data-key="…" zeigen den Text; data-n="…" ersetzt {n}.
+     Attribute: data-key-aria-label, data-key-alt, data-key-title, data-key-placeholder */
+  const ATTR_KEYS = ['aria-label', 'alt', 'title', 'placeholder'];
+  function renderEl(e){
+    if(e.dataset.key){
+      let t = rawText(e.dataset.key);
+      if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
+      e.textContent = fein(t);
+    }
+    ATTR_KEYS.forEach(a => {
+      const k = e.getAttribute('data-key-' + a);
+      if(k){
+        let t = rawText(k);
+        if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
+        e.setAttribute(a, fein(t));
+      }
+    });
+  }
+  function renderKey(key){
+    document.querySelectorAll('[data-key="' + key + '"]').forEach(renderEl);
+    ATTR_KEYS.forEach(a => document.querySelectorAll('[data-key-' + a + '="' + key + '"]').forEach(renderEl));
+  }
+  function renderAll(){
+    document.querySelectorAll('[data-key],' + ATTR_KEYS.map(a => '[data-key-' + a + ']').join(',')).forEach(renderEl);
+  }
+
+  document.documentElement.lang = { de:'de-CH', fr:'fr-CH', it:'it-CH', en:'en-GB' }[LANG] || LANG;
+  document.title = baseText('seitentitel');
+</script>
+<!-- BAUSTEIN:sprachsystem ENDE -->
