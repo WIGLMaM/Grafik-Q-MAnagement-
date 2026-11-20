@@ -164,16 +164,26 @@
     try { return new URL(u, location.href).hostname; } catch (_) { return ''; }
   }
 
+  const STORYLINE_SRC = /story(_html5)?\.html|storyline/i;
+
+  function isStoryline(block, typeStr) {
+    if (/storyline/i.test(typeStr)) return true;
+    return collectStrings(block, /^(src|url|type|kind|mediaType)$/i).some((s) => STORYLINE_SRC.test(s));
+  }
+
   function describeBlock(block) {
     const typeStr = [block.type, block.family, block.variant].filter(Boolean).join(' / ');
-    const hint = TYPE_HINT.test(typeStr) && !/storyline/i.test(typeStr);
-    const raw = findRawHtml(block);
-    if (!hint && !raw) return null;
+    const storyline = isStoryline(block, typeStr);
+    const scenario = !storyline && /scenario/i.test(typeStr);
+    const hint = TYPE_HINT.test(typeStr);
+    const raw = storyline || scenario ? null : findRawHtml(block);
+    if (!storyline && !scenario && !hint && !raw) return null;
 
     let kind;
-    if (/code/i.test(typeStr)) kind = 'Code-Block';
+    if (storyline) kind = 'Storyline';
+    else if (scenario) kind = 'Szenario';
     else if (/embed|iframe/i.test(typeStr)) kind = 'Embed';
-    else if (/html|custom/i.test(typeStr)) kind = 'HTML-Block';
+    else if (/code|html|custom/i.test(typeStr)) kind = 'Code-/HTML-Block';
     else kind = 'HTML im Inhalt';
 
     const urls = extractUrls(raw, block);
@@ -183,7 +193,7 @@
     let name = titleCandidates[0] || '';
     if (!name && urls[0]) name = hostOf(urls[0]);
     if (!name && raw) name = raw.replace(/\s+/g, ' ').trim().slice(0, 60);
-    if (!name) name = '(ohne Titel)';
+    if (!name) name = storyline ? 'Storyline-Block (ohne Titel)' : scenario ? 'Szenario (ohne Titel)' : '(ohne Titel)';
 
     const codeSource = raw || collectStrings(block, /(code|html|embed|content|markup)/i)[0] || '';
     return {
@@ -268,9 +278,11 @@
     blocks.forEach((b, i) => {
       const iframe = b.querySelector('iframe');
       const code = b.querySelector('pre, code');
-      if (!iframe && !code) return;
+      const scenario = /scenario/i.test(b.className) || b.querySelector('[class*="scenario" i]');
+      if (!iframe && !code && !scenario) return;
       const src = iframe ? iframe.getAttribute('src') || '' : '';
-      if (/storyline|story_html5|story\.html/i.test(src)) return;
+      const storyline = STORYLINE_SRC.test(src) || /storyline/i.test(b.className) || b.querySelector('[class*="storyline" i]');
+      const kind = storyline ? 'Storyline' : scenario ? 'Szenario' : iframe ? 'Embed' : 'Code-/HTML-Block';
       const heading = stripHtml((b.querySelector('h1,h2,h3,h4') || {}).textContent);
       out.push({
         chapter: '–',
@@ -280,11 +292,13 @@
         blockId: b.getAttribute('data-block-id'),
         blockNo: i + 1,
         url: lessonUrl(lesson.id),
-        kind: iframe ? 'Embed / HTML (iFrame)' : 'Code-Block',
+        kind,
         blockType: 'aus Seitenansicht erkannt',
         name: (iframe && iframe.title) || heading || (src && hostOf(src)) || '(ohne Titel)',
         urls: src && !src.startsWith('about:') ? [src] : [],
-        preview: iframe ? (iframe.getAttribute('srcdoc') || src).slice(0, 400) : stripHtml(code.textContent).slice(0, 400),
+        preview: iframe
+          ? (iframe.getAttribute('srcdoc') || src).slice(0, 400)
+          : stripHtml((code || b).textContent).slice(0, 400),
       });
     });
     return out;

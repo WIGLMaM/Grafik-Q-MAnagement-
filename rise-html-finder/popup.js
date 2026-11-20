@@ -2,6 +2,42 @@ const $ = (id) => document.getElementById(id);
 let tab = null;
 let state = null; // { result, frameId }
 
+const KINDS = [
+  { id: 'Embed', label: 'Embed (iFrame)' },
+  { id: 'Code-/HTML-Block', label: 'Code-/HTML-Block' },
+  { id: 'HTML im Inhalt', label: 'HTML im Inhalt' },
+  { id: 'Storyline', label: 'Storyline (SL)' },
+  { id: 'Szenario', label: 'Szenario' },
+];
+let selected = new Set(KINDS.map((k) => k.id));
+
+const visibleItems = () => (state && state.result ? state.result.items.filter((it) => selected.has(it.kind)) : []);
+
+function renderFilters() {
+  const box = $('filters');
+  box.querySelectorAll('label').forEach((l) => l.remove());
+  const all = state && state.result ? state.result.items : null;
+  for (const k of KINDS) {
+    const count = all ? all.filter((it) => it.kind === k.id).length : null;
+    const label = document.createElement('label');
+    label.innerHTML =
+      `<input type="checkbox" value="${esc(k.id)}" ${selected.has(k.id) ? 'checked' : ''}>` +
+      `${esc(k.label)}${count === null ? '' : ` <span class="count">(${count})</span>`}`;
+    label.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) selected.add(k.id);
+      else selected.delete(k.id);
+      onFilterChange();
+    });
+    box.appendChild(label);
+  }
+}
+
+async function onFilterChange() {
+  await chrome.storage.local.set({ selectedKinds: [...selected] });
+  if (state && state.result) render();
+  else renderFilters();
+}
+
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -79,19 +115,26 @@ function render() {
   const r = state.result;
   const box = $('results');
   box.innerHTML = '';
-  const n = r.items.length;
+  renderFilters();
+  const items = visibleItems();
+  const n = items.length;
   setStatus(
     `<strong>${esc(r.courseTitle)}</strong><br>` +
-      (n
-        ? `${n} HTML-Stelle${n === 1 ? '' : 'n'} in ${r.lessonCount} Lektionen gefunden. Klick auf einen Eintrag springt dorthin.`
-        : `Keine manuell eingebauten HTML-Blöcke in ${r.lessonCount} Lektionen gefunden.`) +
+      (selected.size === 0
+        ? 'Keine Kategorie ausgewählt.'
+        : n
+        ? `${n} Fundstelle${n === 1 ? '' : 'n'} in ${r.lessonCount} Lektionen` +
+          (n < r.items.length ? ` (${r.items.length} insgesamt)` : '') +
+          '. Klick auf einen Eintrag springt dorthin.'
+        : `Keine passenden Blöcke in ${r.lessonCount} Lektionen gefunden` +
+          (r.items.length ? ` (${r.items.length} in anderen Kategorien)` : '') + '.') +
       (r.source === 'dom' ? '<br><em>Quelle: Seitenansicht (Kapitel nicht verfügbar)</em>' : '')
   );
   $('actions').hidden = n === 0;
 
   let lastChapter = null;
   let lastLesson = null;
-  r.items.forEach((it, idx) => {
+  items.forEach((it) => {
     if (it.chapter !== lastChapter) {
       lastChapter = it.chapter;
       lastLesson = null;
@@ -107,13 +150,12 @@ function render() {
     btn.innerHTML =
       `<span class="name"><span class="badge">${esc(it.kind)}</span>${esc(it.name)}</span>` +
       `<span class="meta">Block ${it.blockNo}${it.urls[0] ? ' · ' + esc(it.urls[0]) : ''}</span>`;
-    btn.addEventListener('click', () => goTo(idx));
+    btn.addEventListener('click', () => goTo(it));
     box.appendChild(btn);
   });
 }
 
-async function goTo(idx) {
-  const it = state.result.items[idx];
+async function goTo(it) {
   try {
     const target = await inject([state.frameId]);
     const [res] = await run(target, 'goTo', [it.lessonId, it.blockId]);
@@ -136,12 +178,12 @@ function download(name, content, type) {
 }
 
 const fileBase = () =>
-  `HTML-Protokoll_${(state.result.courseTitle || 'Rise-Kurs').replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 60)}_${new Date().toISOString().slice(0, 10)}`;
+  `Block-Protokoll_${(state.result.courseTitle || 'Rise-Kurs').replace(/[^\wäöüÄÖÜß-]+/g, '_').slice(0, 60)}_${new Date().toISOString().slice(0, 10)}`;
 
 function exportCsv() {
   const cols = ['Nr', 'Kapitel', 'Lektion-Nr', 'Lektion', 'Block-Nr', 'Typ', 'Name', 'Blocktyp (Rise)', 'Quellen', 'Link', 'Block-ID', 'Code-Vorschau'];
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const rows = state.result.items.map((it, i) =>
+  const rows = visibleItems().map((it, i) =>
     [i + 1, it.chapter, it.lessonNo, it.lesson, it.blockNo, it.kind, it.name, it.blockType, it.urls.join(' | '), it.url, it.blockId, it.preview].map(q).join(';')
   );
   download(`${fileBase()}.csv`, '﻿' + [cols.map(q).join(';'), ...rows].join('\r\n'), 'text/csv;charset=utf-8');
@@ -150,7 +192,8 @@ function exportCsv() {
 function exportHtml() {
   const r = state.result;
   const date = new Date().toLocaleString('de-CH');
-  const rows = r.items
+  const items = visibleItems();
+  const rows = items
     .map(
       (it, i) => `<tr>
   <td>${i + 1}</td><td>${esc(it.chapter)}</td><td>${it.lessonNo}. ${esc(it.lesson)}</td><td>${it.blockNo}</td>
@@ -167,8 +210,8 @@ h1{font-size:20px;margin:0 0 4px}.meta{color:#656d76;margin-bottom:16px}
 table{border-collapse:collapse;width:100%}th,td{border:1px solid #d8dee4;padding:6px 8px;vertical-align:top;text-align:left}
 th{background:#f6f8fa}code{font-size:12px;word-break:break-all;white-space:pre-wrap}
 </style></head><body>
-<h1>HTML-Protokoll: ${esc(r.courseTitle)}</h1>
-<div class="meta">Kurs-Link: <a href="${esc(r.baseUrl)}">${esc(r.baseUrl)}</a><br>Erstellt: ${esc(date)} · ${r.items.length} Fundstellen in ${r.lessonCount} Lektionen${r.source === 'dom' ? ' · Quelle: Seitenansicht' : ''}</div>
+<h1>Block-Protokoll: ${esc(r.courseTitle)}</h1>
+<div class="meta">Kurs-Link: <a href="${esc(r.baseUrl)}">${esc(r.baseUrl)}</a><br>Erstellt: ${esc(date)} · ${items.length} Fundstellen in ${r.lessonCount} Lektionen<br>Kategorien: ${esc([...selected].join(', '))}${r.source === 'dom' ? ' · Quelle: Seitenansicht' : ''}</div>
 <table><thead><tr><th>Nr</th><th>Kapitel</th><th>Lektion</th><th>Block</th><th>Typ</th><th>Name</th><th>Quellen</th><th>Link</th><th>Code-Vorschau</th></tr></thead>
 <tbody>${rows}</tbody></table></body></html>`;
   download(`${fileBase()}.html`, html, 'text/html;charset=utf-8');
@@ -182,6 +225,14 @@ th{background:#f6f8fa}code{font-size:12px;word-break:break-all;white-space:pre-w
   $('crawl').addEventListener('click', crawl);
   $('exportCsv').addEventListener('click', exportCsv);
   $('exportHtml').addEventListener('click', exportHtml);
+  $('toggleAll').addEventListener('click', () => {
+    selected = selected.size === KINDS.length ? new Set() : new Set(KINDS.map((k) => k.id));
+    onFilterChange();
+  });
+
+  const stored = (await chrome.storage.local.get('selectedKinds')).selectedKinds;
+  if (Array.isArray(stored)) selected = new Set(stored.filter((k) => KINDS.some((x) => x.id === k)));
+  renderFilters();
 
   // Letztes Ergebnis für diesen Tab wieder anzeigen
   const key = `tab_${tab.id}`;
