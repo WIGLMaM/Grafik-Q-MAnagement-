@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Rise HTML-Finder</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Rise HTML-Finder</h1>
+    <button id="scan" class="primary">Kurs scannen</button>
+  </header>
+
+  <div id="status" class="status">Öffne einen Rise-Kurs und klicke auf «Kurs scannen».</div>
+
+  <div id="actions" class="actions" hidden>
+    <button id="exportHtml">Protokoll (HTML)</button>
+    <button id="exportCsv">Protokoll (CSV)</button>
+  </div>
+
+  <div id="fallback" class="fallback" hidden>
+    <p>Die Kursdaten konnten nicht direkt gelesen werden. Die Erweiterung kann sich stattdessen
+      durch alle Lektionen klicken und die Seite selbst untersuchen. Das dauert etwas länger.</p>
+    <button id="crawl">Lektionen durchsuchen</button>
+  </div>
+
+  <main id="results"></main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

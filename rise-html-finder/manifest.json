@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Rise HTML-Finder",
+  "version": "1.0.0",
+  "description": "Findet manuell eingebaute HTML-/Code-/Embed-Blöcke in Articulate-Rise-Kursen, springt per Klick dorthin und erstellt ein Protokoll.",
+  "action": {
+    "default_title": "Rise HTML-Finder",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"]
+}
