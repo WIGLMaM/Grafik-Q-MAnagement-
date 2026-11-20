@@ -1,17 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <g stroke="#1a1a1a" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round">
-    <!-- Brett: Seitenkanten -->
-    <path d="M5 80 L5 93 L45 115 L45 102 Z" fill="#6e5024"/>
-    <path d="M45 102 L45 115 L123 68 L123 55 Z" fill="#7d5c2a"/>
-    <!-- Brett: Oberseite -->
-    <path d="M5 80 L83 33 L123 55 L45 102 Z" fill="#a8803f"/>
-    <!-- Bügel (U-förmig, hochgeklappt) -->
-    <path d="M66 77 L100 56 Q108 50 106 40 Q103 30 93 30 Q88 30 84 33 L58 49" fill="none"/>
-    <!-- Feder -->
-    <path d="M58 82 q2 -8 7 -4 q2 -8 7 -4" fill="none"/>
-    <!-- Käse -->
-    <path d="M14 82 L42 64 L50 90 Z" fill="#ffd633"/>
-  </g>
-  <circle cx="37" cy="78" r="4" fill="#e0a800"/>
-  <circle cx="28" cy="83" r="2.5" fill="#e0a800"/>
+  <!-- Griff -->
+  <line x1="80" y1="80" x2="116" y2="116" stroke="#111" stroke-width="18" stroke-linecap="round"/>
+  <!-- Glas mit Rand -->
+  <circle cx="52" cy="52" r="40" fill="#ffffff" stroke="#111" stroke-width="13"/>
+  <!-- Glanzlicht -->
+  <path d="M30 56 A24 24 0 0 1 54 30" fill="none" stroke="#111" stroke-width="7" stroke-linecap="round"/>
 </svg>
