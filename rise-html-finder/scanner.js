@@ -205,15 +205,14 @@
     const scenario = !storyline && /scenario/i.test(typeStr);
     const hint = TYPE_HINT.test(typeStr);
     const raw = storyline || scenario ? null : findRawHtml(block);
-    if (!storyline && !scenario && !hint && !raw) return null;
+    if (!storyline && !scenario && !hint) return null;
 
     let kind;
     if (storyline) kind = 'Storyline';
     else if (scenario) kind = 'Szenario';
     else if (/custom/i.test(typeStr)) kind = 'Custom Block';
     else if (/embed|iframe/i.test(typeStr)) kind = 'Embed';
-    else if (/code|html/i.test(typeStr)) kind = 'Code-/HTML-Block';
-    else kind = 'HTML im Inhalt';
+    else kind = 'Code-/HTML-Block';
 
     const urls = extractUrls(raw, block);
     const titleCandidates = [

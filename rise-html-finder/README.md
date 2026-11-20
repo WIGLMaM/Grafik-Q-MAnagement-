@@ -34,7 +34,6 @@ erstellt ein Protokoll (HTML oder CSV).
 | Embed (iFrame) | Rise-Blöcke vom Typ Embed |
 | HTML (Code-Block) | HTML, das über einen Code-Block selbst eingefügt wurde |
 | Custom Block | von Rise vordefinierte Custom Blocks |
-| HTML im Inhalt | andere Blöcke, deren Inhalt `<iframe>`, `<script>`, `<style>`, `<embed>`, `<object>`, `<form>` oder `<canvas>` enthält |
 | Storyline (SL) | Storyline-Blöcke bzw. Blöcke, die auf `story.html` verweisen |
 | Szenario | Rise-Szenario-Blöcke |
 

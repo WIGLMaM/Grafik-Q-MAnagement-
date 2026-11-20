@@ -6,7 +6,6 @@ const KINDS = [
   { id: 'Embed', label: 'Embed (iFrame)' },
   { id: 'Code-/HTML-Block', label: 'HTML (Code-Block)' },
   { id: 'Custom Block', label: 'Custom Block' },
-  { id: 'HTML im Inhalt', label: 'HTML im Inhalt' },
   { id: 'Storyline', label: 'Storyline (SL)' },
   { id: 'Szenario', label: 'Szenario' },
 ];
