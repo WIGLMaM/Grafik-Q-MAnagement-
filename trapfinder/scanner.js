@@ -1,7 +1,9 @@
 // TrapFinder – wird im Seitenkontext (MAIN world) des Rise-Kurses ausgeführt.
 // Stellt window.__riseHtmlFinder mit scan(), crawl() und goTo() bereit.
 (() => {
-  if (window.__riseHtmlFinder) return;
+  // Bei neuer Version der Erweiterung den alten Scanner in der Seite ersetzen
+  const VERSION = '2.2.0';
+  if (window.__riseHtmlFinder && window.__riseHtmlFinder.version === VERSION) return;
 
   // Tags, die in normalem Rise-Text nicht vorkommen und auf manuell eingebauten Code hinweisen.
   const RAW_HTML = /<\s*(iframe|script|embed|object|style|form|canvas)\b/i;
@@ -29,6 +31,39 @@
       .replace(/&amp;/g, '&')
       .replace(/\s+/g, ' ')
       .trim();
+
+  // Titel können im Editor Objekte sein (z. B. pro Sprache) – Text daraus lesen.
+  function textOf(v, depth = 4) {
+    if (v == null || depth < 0) return '';
+    if (typeof v === 'string') return stripHtml(v);
+    if (typeof v === 'number') return String(v);
+    if (Array.isArray(v)) return v.map((x) => textOf(x, depth - 1)).filter(Boolean).join(' ');
+    if (typeof v === 'object') {
+      const lang = (navigator.language || '').slice(0, 2).toLowerCase();
+      for (const k of [lang, 'de', 'en', 'text', 'value', 'title', 'plain', 'label', 'html', 'content']) {
+        if (k && k in v) {
+          const t = textOf(v[k], depth - 1);
+          if (t) return t;
+        }
+      }
+      for (const k of Object.keys(v)) {
+        const t = textOf(v[k], depth - 1);
+        if (t) return t;
+      }
+    }
+    return '';
+  }
+
+  // Erster lesbarer Text eines Blocks (z. B. Überschrift in einem Custom Block)
+  function firstText(block) {
+    const skip = /^(id|key|type|family|variant|src|url|href|style|class|color|font|align|layout|.*Id|.*Url|.*Color)$/i;
+    for (const { key, value } of allStrings(block)) {
+      if (skip.test(key) || /^https?:|^#|^[\w-]{16,}$/.test(value)) continue;
+      const t = stripHtml(value);
+      if (t.length >= 3 && /[A-Za-zÄÖÜäöü]{3}/.test(t) && !/^[{[]/.test(t)) return t.slice(0, 80);
+    }
+    return '';
+  }
 
   const baseUrl = () => location.href.split('#')[0];
   const isAuthoring = () => /\/authoring\//.test(location.pathname);
@@ -276,15 +311,21 @@
       let kind;
       if (storyline) kind = 'Storyline';
       else if (scenario) kind = 'Szenario';
-      else if (/custom/i.test(typeStr)) kind = 'Custom Block';
+      else if (/mondrian/i.test(typeStr)) kind = 'Custom Block'; // Rise-intern: Custom Blocks
       else if (/embed|iframe/i.test(typeStr)) kind = 'Embed';
+      else if (/code|html/i.test(typeStr)) kind = 'Code-/HTML-Block';
+      else if (/custom/i.test(typeStr)) kind = 'Custom Block';
       else kind = 'Code-/HTML-Block';
 
       const urls = extractUrls(raw, block);
       const sl = storyline ? storylineInfo(block) : { slName: '', storyUrl: '' };
       if (sl.storyUrl && !urls.includes(sl.storyUrl)) urls.unshift(sl.storyUrl);
-      const titleCandidates = collectStrings(block, /^(title|heading|name|caption|label)$/i, [], 3).map(stripHtml).filter(Boolean);
+      const titleCandidates = ['title', 'heading', 'name', 'caption', 'label']
+        .map((k) => textOf(block[k]))
+        .concat(collectStrings(block, /^(title|heading|name|caption|label)$/i, [], 3).map(stripHtml))
+        .filter(Boolean);
       let name = sl.slName || titleCandidates[0] || '';
+      if (!name && !storyline && kind !== 'Code-/HTML-Block') name = firstText(block);
       if (!name && !storyline && urls[0]) name = hostOf(urls[0]);
       if (!name && raw) name = raw.replace(/\s+/g, ' ').trim().slice(0, 60);
       if (!name) name = storyline ? 'Storyline-Block (ohne Titel)' : scenario ? 'Szenario (ohne Titel)' : '(ohne Titel)';
@@ -325,7 +366,7 @@
     for (const lesson of course.lessons || []) {
       if (!lesson) continue;
       if (lesson.type === 'section') {
-        chapter = stripHtml(lesson.title);
+        chapter = textOf(lesson.title);
         continue;
       }
       lessonNo++;
@@ -333,7 +374,7 @@
         if (!block || typeof block !== 'object') return;
         for (const d of describeBlock(block)) items.push({
           chapter: chapter || '–',
-          lesson: stripHtml(lesson.title) || `Lektion ${lessonNo}`,
+          lesson: textOf(lesson.title) || `Lektion ${lessonNo}`,
           lessonNo,
           lessonId: lesson.id,
           blockId: block.id || '',
@@ -363,7 +404,7 @@
       const items = analyzeCourse(course);
       return {
         source: 'data',
-        courseTitle: stripHtml(course.title) || document.title,
+        courseTitle: textOf(course.title) || document.title.replace(/\s*\|\s*Rise 360\s*$/i, ''),
         baseUrl: baseUrl(),
         lessonCount: (course.lessons || []).filter((l) => l && l.type !== 'section').length,
         lessonsWithContent: (course.lessons || []).filter((l) => l && Array.isArray(l.items) && l.items.length).length,
@@ -513,5 +554,5 @@
     };
   }
 
-  window.__riseHtmlFinder = { scan, crawl, goTo, diagnose };
+  window.__riseHtmlFinder = { version: VERSION, scan, crawl, goTo, diagnose };
 })();
