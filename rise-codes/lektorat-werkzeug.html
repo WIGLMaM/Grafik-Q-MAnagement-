@@ -43,6 +43,9 @@
   iframe{width:100%;height:640px;border:1px solid var(--purple-100);border-radius:var(--radius);margin-top:10px;background:#ececec;}
   .hidden{display:none;}
   .table-scroll{overflow-x:auto;}
+  h3.sub{font-size:14.5px;margin:18px 0 4px;color:var(--purple-800);}
+  textarea#inComments{width:100%;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;border:1.5px solid var(--purple-300);border-radius:var(--radius);padding:8px 10px;resize:vertical;}
+  textarea#inComments:focus{outline:2px solid var(--purple-800);outline-offset:1px;}
 </style>
 </head>
 <body>
@@ -69,8 +72,13 @@
 
   <!-- 3 -->
   <section class="card">
-    <h2><span class="n">3</span>Korrigiertes Excel einlesen</h2>
-    <p class="hint">Die zurückgeschickte Excel-Datei hierher ziehen. Die passenden HTML-Codes müssen in Schritt 1 geladen sein.</p>
+    <h2><span class="n">3</span>Korrekturen einlesen</h2>
+    <p class="hint">Die passenden HTML-Codes müssen in Schritt 1 geladen sein.</p>
+    <h3 class="sub">Kommentare aus dem Rise Review</h3>
+    <p class="hint">Einen oder mehrere Kommentare aus dem Lektoratsmodus hier einfügen. Sie beginnen mit <code>[[Lektorat …]]</code>.</p>
+    <textarea id="inComments" rows="7" placeholder="[[Lektorat vier-fragen fr]]&#10;[[fragen.2.frage | Frage 3 › Fragetext]] De quelle couleur est le vin ?"></textarea>
+    <div class="row"><button class="main" id="btnComments">Kommentare übernehmen</button></div>
+    <h3 class="sub">Oder: korrigiertes Excel</h3>
     <label class="drop" id="dropXlsx">Excel-Datei hierher ziehen oder klicken
       <input type="file" id="inXlsx" accept=".xlsx">
     </label>
@@ -221,7 +229,9 @@ async function loadHtmlFiles(files){
     const source = await f.text();
     try{
       const texte = parseTexte(source);
-      codes.set(f.name, { name:f.name, source, texte, newSource:null });
+      const idm = /const\s+CODE_ID\s*=\s*['"]([^'"]+)['"]/.exec(source);
+      const codeId = idm ? idm[1] : f.name.replace(/\.html?$/i, '');
+      codes.set(f.name, { name:f.name, codeId, source, texte, newSource:null });
     }catch(e){
       codes.set(f.name, { name:f.name, error:e.message });
     }
@@ -240,7 +250,7 @@ function renderHtmlList(){
     else{
       okCount++;
       b.className = 'ok';
-      b.textContent = flatten(c.texte.de).length + ' Texte · Sprachen: ' + langsOf(c.texte).join(', ').toUpperCase();
+      b.textContent = 'Name: ' + c.codeId + ' · ' + flatten(c.texte.de).length + ' Texte · Sprachen: ' + langsOf(c.texte).join(', ').toUpperCase();
     }
     li.append(a, b); ul.append(li);
   });
@@ -297,11 +307,104 @@ function exportExcel(){
 }
 
 /* =====================================================================
-   Schritt 3: Excel einlesen
+   Schritt 3: Korrekturen einlesen (Kommentare oder Excel)
+   Beide Wege erzeugen eine Liste { ref, id, lang, neu, where } und
+   laufen durch dieselbe Prüfung.
    ===================================================================== */
+function findCode(ref){
+  const r = String(ref || '').trim();
+  for(const c of codes.values()){
+    if(c.error) continue;
+    if(c.name === r || c.codeId === r || c.name.replace(/\.html?$/i, '') === r) return c;
+  }
+  return null;
+}
+
+function applyEntries(entries, msgs, sourceName){
+  const changes = [];
+  const work = new Map();
+  codes.forEach(c => { if(!c.error) work.set(c.name, JSON.parse(JSON.stringify(c.texte))); });
+  const missingCodes = new Set();
+
+  for(const en of entries){
+    const c = findCode(en.ref);
+    if(!c){ missingCodes.add(en.ref); continue; }
+    const texte = work.get(c.name);
+    const path = en.id.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s);
+    const deText = getAt(texte.de, path);
+    if(typeof deText !== 'string'){
+      msgs.push({ type:'warn', text:`${en.where}: Die Stelle «${en.id}» gibt es im Code ${c.codeId} nicht (mehr). Übersprungen.` });
+      continue;
+    }
+    if(!texte[en.lang]){
+      msgs.push({ type:'err', text:`${en.where}: Die Sprache «${en.lang}» gibt es im Code ${c.codeId} nicht. Übersprungen.` });
+      continue;
+    }
+    const stelle = label(path);
+    const neu = en.neu;
+    const alt = getAt(texte[en.lang], path);
+    if(neu.trim() === ''){
+      if(typeof alt === 'string' && alt !== '') msgs.push({ type:'warn', text:`${c.codeId} · ${stelle} · ${en.lang.toUpperCase()}: Text ist leer, der bisherige Text bleibt.` });
+      continue;
+    }
+    if(neu === alt) continue;
+    const phAlt = (deText.match(/\{\w+\}/g) || []).sort().join();
+    const phNeu = (neu.match(/\{\w+\}/g) || []).sort().join();
+    if(phAlt !== phNeu){
+      msgs.push({ type:'err', text:`${c.codeId} · ${stelle} · ${en.lang.toUpperCase()}: Platzhalter fehlt oder ist verändert (${phAlt || 'keiner'} erwartet). Änderung nicht übernommen.` });
+      continue;
+    }
+    setAt(texte[en.lang], path, neu);
+    changes.push({ name:c.name, stelle, lang:en.lang, alt: alt ?? '', neu });
+  }
+
+  missingCodes.forEach(n => msgs.push({ type:'err', text:`Der Code «${n}» ist nicht geladen. Bitte in Schritt 1 hinzufügen und erneut einlesen.` }));
+
+  const changedNames = new Set(changes.map(c => c.name));
+  codes.forEach(c => { c.newSource = null; });
+  changedNames.forEach(n => {
+    const c = codes.get(n);
+    c.newSource = replaceTexte(c.source, work.get(n));
+    c.newTexte = work.get(n);
+  });
+
+  if(changes.length) msgs.unshift({ type:'ok', text:`${changes.length} Änderung(en) in ${changedNames.size} Code(s) übernommen.` });
+  else msgs.unshift({ type:'ok', text:`Keine Änderungen gefunden: ${sourceName} entspricht den geladenen Codes.` });
+
+  showMessages(msgs);
+  renderChanges(changes);
+  renderResult([...changedNames]);
+}
+
+/* Kommentare: [[Lektorat <code> <sprache>]] gefolgt von [[<stelle> | <name>]] <text> */
+function parseComments(text){
+  const entries = [], msgs = [];
+  const re = /\[\[([^\[\]]+)\]\]/g;
+  const marks = [];
+  let m;
+  while((m = re.exec(text))) marks.push({ inner:m[1].trim(), start:m.index, end:re.lastIndex });
+  let cur = null, blocks = 0;
+  marks.forEach((mk, i) => {
+    const head = /^Lektorat\s+(\S+)\s+([a-z]{2,3})$/i.exec(mk.inner);
+    if(head){ cur = { ref:head[1], lang:head[2].toLowerCase() }; blocks++; return; }
+    const until = i + 1 < marks.length ? marks[i + 1].start : text.length;
+    const neu = text.slice(mk.end, until).replace(/\s+/g, ' ').trim();
+    const id = mk.inner.split('|')[0].trim();
+    if(!cur){ msgs.push({ type:'err', text:`Korrektur «${id}» steht vor der Zeile [[Lektorat …]] und wird übersprungen.` }); return; }
+    entries.push({ ref:cur.ref, lang:cur.lang, id, neu, where:`Kommentar ${cur.ref} ${cur.lang.toUpperCase()}` });
+  });
+  if(!blocks) msgs.push({ type:'err', text:'Kein Kommentar aus dem Lektoratsmodus gefunden. Er beginnt mit [[Lektorat …]].' });
+  return { entries, msgs };
+}
+
+function importComments(){
+  const { entries, msgs } = parseComments($('inComments').value);
+  if(!entries.length){ showMessages(msgs.length ? msgs : [{ type:'err', text:'Keine Korrekturen gefunden.' }]); renderChanges([]); renderResult([]); return; }
+  applyEntries(entries, msgs, 'der Kommentar');
+}
+
 async function importExcel(file){
   const msgs = [];
-  const changes = [];
   const wb = XLSX.read(await file.arrayBuffer(), { type:'array' });
   const ws = wb.Sheets['Texte'] || wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
@@ -317,62 +420,17 @@ async function importExcel(file){
     return;
   }
 
-  // Arbeitskopien der Texte
-  const work = new Map();
-  codes.forEach(c => { if(!c.error) work.set(c.name, JSON.parse(JSON.stringify(c.texte))); });
-  const missingCodes = new Set();
-
+  const entries = [];
   for(let r = 1; r < rows.length; r++){
     const row = rows[r];
-    const name = String(row[colCode] || '').trim();
+    const ref = String(row[colCode] || '').trim();
     const id = String(row[colId] || '').trim();
-    if(!name && !id) continue;
-    const texte = work.get(name);
-    if(!texte){ missingCodes.add(name); continue; }
-    const path = id.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s);
-    const deText = getAt(texte.de, path);
-    if(typeof deText !== 'string'){
-      msgs.push({ type:'warn', text:`Zeile ${r + 1}: ID «${id}» gibt es im Code ${name} nicht mehr. Zeile übersprungen.` });
-      continue;
-    }
-    const stelle = label(path);
+    if(!ref && !id) continue;
     for(const [lang, col] of Object.entries(langCols)){
-      const neu = String(row[col] ?? '').replace(/\r\n/g, '\n');
-      if(!texte[lang]) texte[lang] = {};
-      const alt = getAt(texte[lang], path);
-      if(neu.trim() === ''){
-        if(typeof alt === 'string' && alt !== '') msgs.push({ type:'warn', text:`${name} · ${stelle} · ${lang.toUpperCase()}: Zelle ist leer, der bisherige Text bleibt.` });
-        continue;
-      }
-      if(neu === alt) continue;
-      const phAlt = (deText.match(/\{\w+\}/g) || []).sort().join();
-      const phNeu = (neu.match(/\{\w+\}/g) || []).sort().join();
-      if(phAlt !== phNeu){
-        msgs.push({ type:'err', text:`${name} · ${stelle} · ${lang.toUpperCase()}: Platzhalter fehlt oder ist verändert (${phAlt || 'keiner'} erwartet). Änderung nicht übernommen.` });
-        continue;
-      }
-      setAt(texte[lang], path, neu);
-      changes.push({ name, stelle, lang, alt: alt ?? '', neu });
+      entries.push({ ref, id, lang, neu:String(row[col] ?? '').replace(/\r\n/g, '\n'), where:`Excel-Zeile ${r + 1}` });
     }
   }
-
-  missingCodes.forEach(n => msgs.push({ type:'err', text:`Der Code «${n}» ist nicht geladen. Bitte in Schritt 1 hinzufügen und Excel erneut einlesen.` }));
-
-  // Neue Quelltexte erzeugen
-  const changedNames = new Set(changes.map(c => c.name));
-  codes.forEach(c => { c.newSource = null; });
-  changedNames.forEach(n => {
-    const c = codes.get(n);
-    c.newSource = replaceTexte(c.source, work.get(n));
-    c.newTexte = work.get(n);
-  });
-
-  if(changes.length) msgs.unshift({ type:'ok', text:`${changes.length} Änderung(en) in ${changedNames.size} Code(s) übernommen.` });
-  else msgs.unshift({ type:'ok', text:'Keine Änderungen gefunden: die Excel-Datei entspricht den geladenen Codes.' });
-
-  showMessages(msgs);
-  renderChanges(changes);
-  renderResult([...changedNames]);
+  applyEntries(entries, msgs, 'die Excel-Datei');
 }
 
 function showMessages(list){
@@ -457,6 +515,7 @@ function wireDrop(zoneId, inputId, handler){
 wireDrop('dropHtml', 'inHtml', files => loadHtmlFiles([...files]));
 wireDrop('dropXlsx', 'inXlsx', files => importExcel(files[0]).catch(e => showMessages([{ type:'err', text:'Excel konnte nicht gelesen werden: ' + e.message }])));
 $('btnExport').addEventListener('click', exportExcel);
+$('btnComments').addEventListener('click', importComments);
 
 if(typeof XLSX === 'undefined'){
   showMessages([{ type:'err', text:'Die Excel-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen und Seite neu laden.' }]);

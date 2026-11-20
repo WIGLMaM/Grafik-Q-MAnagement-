@@ -12,6 +12,7 @@
      ===================================================================== -->
 <script>
   const SPRACHE = 'de';
+  const CODE_ID = 'vier-fragen';   // eindeutiger Name dieser Grafik (nicht ändern)
 </script>
 
 <!-- =====================================================================
@@ -581,6 +582,11 @@ const TEXTE = {
     border-radius:0 0 var(--radius) var(--radius);
   }
 
+  /* ---------- Lektoratsmodus: alle Stufen offen ---------- */
+
+  body.lektorat .step .step-body{ grid-template-rows:1fr; }
+  body.lektorat .step .chev{ transform:rotate(180deg); }
+
   /* ---------- Mobil ---------- */
 
   @media (max-width:720px){
@@ -600,13 +606,13 @@ const TEXTE = {
 <div class="wrap">
 
   <header class="top">
-    <h1 data-t="titel"></h1>
-    <p data-t="intro"></p>
+    <h1 data-key="titel"></h1>
+    <p data-key="intro"></p>
   </header>
 
   <section class="panel">
 
-    <p class="instruction" data-t="anleitung"></p>
+    <p class="instruction" data-key="anleitung"></p>
 
     <div class="glass-top" aria-hidden="true">
       <svg viewBox="0 0 140 110" fill="none" stroke="#501688" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -621,7 +627,7 @@ const TEXTE = {
         <path d="M100 64 V100"/>
         <path d="M86 104 H114"/>
       </svg>
-      <span class="start" data-t="start"></span>
+      <span class="start" data-key="start"></span>
     </div>
 
     <div class="stairs" id="stairs">
@@ -640,8 +646,8 @@ const TEXTE = {
           <circle cx="46" cy="25" r="2"/>
         </svg>
         <div>
-          <strong data-t="kellerTitel"></strong>
-          <span data-t="kellerText"></span>
+          <strong data-key="kellerTitel"></strong>
+          <span data-key="kellerText"></span>
         </div>
       </div>
     </div>
@@ -652,42 +658,70 @@ const TEXTE = {
 </div>
 
 <script>
-  /* ---------- Sprache wählen (zum Testen auch über ?lang=fr in der Adresse) ---------- */
+  /* =====================================================================
+     TEXTE ANZEIGEN
+     Jedes Element mit data-key="…" zeigt den passenden Text aus TEXTE.
+     ===================================================================== */
   const urlLang = new URLSearchParams(location.search).get('lang');
   const LANG = TEXTE[urlLang] ? urlLang : (TEXTE[SPRACHE] ? SPRACHE : 'de');
   const T = TEXTE[LANG];
+  const OVERRIDES = {};   // vorläufige Korrekturen aus dem Lektoratsmodus
+
+  // Lesbare Namen der Textstellen (für den Lektoratsmodus und das Werkzeug)
+  const LABELS = {
+    seitentitel:'Seitentitel', titel:'Titel', intro:'Einleitung', anleitung:'Anleitung',
+    start:'Beschriftung Start', frageVon:'Zähler «Frage x von 4»', weiterZu:'Button «Weiter»',
+    zumKeller:'Button «Keller»', fragen:'Frage', zeilen:'Zeile', frage:'Fragetext', stichwort:'Stichwort',
+    fazit:'Fazit', kellerTitel:'Keller: Titel', kellerText:'Keller: Text'
+  };
+
+  function pathOf(key){ return key.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s); }
+  function getAt(obj, path){ return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+
+  // Text aus TEXTE (ohne Korrekturen); fehlt er in der Sprache, gilt der deutsche
+  function baseText(key){
+    const p = pathOf(key);
+    const v = getAt(T, p);
+    if(typeof v === 'string') return v;
+    const d = getAt(TEXTE.de, p);
+    return typeof d === 'string' ? d : '';
+  }
+  function rawText(key){ return key in OVERRIDES ? OVERRIDES[key] : baseText(key); }
 
   // Französisch: geschützte Leerzeichen vor ? ! ; (schmal) und vor : % (normal)
   function fein(text){
     if(LANG !== 'fr') return text;
-    return text
-      .replace(/ ([?!;])/g, ' $1')
-      .replace(/ ([:%])/g, ' $1');
+    return text.replace(/ ([?!;])/g, ' $1').replace(/ ([:%])/g, ' $1');
   }
-  function mitNummer(text, n){ return fein(text.replace('{n}', n)); }
+
+  function renderEl(e){
+    let t = rawText(e.dataset.key);
+    if(e.dataset.n) t = t.replace('{n}', e.dataset.n);
+    e.textContent = fein(t);
+  }
+  function renderKey(key){ document.querySelectorAll('[data-key="' + key + '"]').forEach(renderEl); }
+  function renderAll(){ document.querySelectorAll('[data-key]').forEach(renderEl); }
 
   document.documentElement.lang = { de:'de-CH', fr:'fr-CH', it:'it-CH', en:'en-GB' }[LANG];
-  document.title = T.seitentitel;
-
-  document.querySelectorAll('[data-t]').forEach(el => {
-    el.textContent = fein(T[el.dataset.t] || TEXTE.de[el.dataset.t] || '');
-  });
+  document.title = baseText('seitentitel');
 
   /* ---------- Stufen aufbauen ---------- */
   const stairs = document.getElementById('stairs');
   const cellar = document.getElementById('cellar');
   const CHEV = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9 L12 15 L18 9"/></svg>';
 
-  function el(tag, cls, text){
+  function el(tag, cls, key, n){
     const e = document.createElement(tag);
     if(cls) e.className = cls;
-    if(text != null) e.textContent = fein(text);
+    if(key) e.dataset.key = key;
+    if(n != null) e.dataset.n = n;
     return e;
   }
 
   T.fragen.forEach((f, i) => {
     const n = i + 1;
     const letzte = n === T.fragen.length;
+    const k = 'fragen.' + i + '.';
 
     const step = el('div', 'step');
     step.dataset.step = n;
@@ -697,28 +731,25 @@ const TEXTE = {
     head.setAttribute('aria-expanded', 'false');
     head.setAttribute('aria-controls', 'body-' + n);
 
+    const num = el('span', 'num'); num.textContent = n;
     const headText = el('span', 'head-text');
-    headText.append(
-      el('span', 'kicker', mitNummer(T.frageVon, n)),
-      el('span', 'question', f.frage),
-      el('span', 'word', f.stichwort)
-    );
-    head.append(el('span', 'num', String(n)), headText);
+    headText.append(el('span', 'kicker', 'frageVon', n), el('span', 'question', k + 'frage'), el('span', 'word', k + 'stichwort'));
+    head.append(num, headText);
     head.insertAdjacentHTML('beforeend', CHEV);
 
     const rows = el('ul', 'rows');
-    f.zeilen.forEach(([zeichen, bedeutung]) => {
+    f.zeilen.forEach((z, j) => {
       const li = el('li');
-      li.append(el('span', 'sign', zeichen), el('span', null, bedeutung));
+      li.append(el('span', 'sign', k + 'zeilen.' + j + '.0'), el('span', null, k + 'zeilen.' + j + '.1'));
       rows.append(li);
     });
 
-    const next = el('button', 'next', letzte ? T.zumKeller : mitNummer(T.weiterZu, n + 1));
+    const next = letzte ? el('button', 'next', 'zumKeller') : el('button', 'next', 'weiterZu', n + 1);
     next.type = 'button';
     next.dataset.next = letzte ? 'cellar' : n + 1;
 
     const foot = el('div', 'content-foot');
-    foot.append(el('span', 'essence', f.fazit), next);
+    foot.append(el('span', 'essence', k + 'fazit'), next);
 
     const content = el('div', 'content');
     content.append(rows, foot);
@@ -732,7 +763,9 @@ const TEXTE = {
     stairs.insertBefore(step, cellar);
   });
 
-  /* ---------- Verhalten (unverändert) ---------- */
+  renderAll();
+
+  /* ---------- Verhalten ---------- */
   const steps = document.querySelectorAll('.step');
 
   function openStep(n){
@@ -772,6 +805,280 @@ const TEXTE = {
       setTimeout(() => el.scrollIntoView({ behavior:'smooth', block:'nearest' }), 260);
     });
   });
+</script>
+
+<!-- =====================================================================
+     LEKTORATSMODUS (Baustein, in allen Codes gleich – nicht ändern)
+     Ein- und ausschalten: zuerst in die Grafik klicken, dann Ctrl+Alt+L.
+     Korrekturen werden nicht gespeichert, sondern als Text kopiert und
+     als Kommentar im Rise Review eingefügt.
+     Benötigt aus dem Code: TEXTE, LANG, CODE_ID, LABELS, OVERRIDES,
+     baseText(), renderKey(), renderAll().
+     ===================================================================== -->
+<style>
+  body.lektorat [data-key]{ outline:1.5px dashed currentColor; outline-offset:2px; cursor:text; border-radius:2px; }
+  body.lektorat [data-key]:hover{ outline-style:solid; }
+  body.lektorat [data-key].lk-changed{ outline:2.5px solid #f0a500; background-image:linear-gradient(rgba(240,165,0,.18), rgba(240,165,0,.18)); }
+  .lk-ui[hidden], .lk-ui [hidden]{ display:none !important; }
+  .lk-ui, .lk-ui *{ box-sizing:border-box; font-family:'Open Sans', system-ui, sans-serif; }
+  .lk-bar{ position:sticky; top:0; z-index:1000; background:#2b2430; color:#fff; padding:10px 14px; display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:13.5px; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+  .lk-bar .lk-title{ font-weight:800; }
+  .lk-bar .lk-count{ background:#f0a500; color:#2b2430; font-weight:800; border-radius:999px; padding:1px 9px; }
+  .lk-bar .lk-hint{ flex-basis:100%; opacity:.8; font-size:12.5px; }
+  .lk-bar .lk-spacer{ flex:1; }
+  .lk-btn{ border:0; border-radius:4px; font:inherit; font-size:13px; font-weight:700; padding:7px 12px; cursor:pointer; background:#fff; color:#2b2430; }
+  .lk-btn.lk-primary{ background:#f0a500; color:#2b2430; }
+  .lk-btn.lk-ghost{ background:transparent; color:#fff; border:1px solid rgba(255,255,255,.5); }
+  .lk-btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .lk-btn:focus-visible{ outline:2px solid #f0a500; outline-offset:2px; }
+  .lk-out{ flex-basis:100%; display:flex; flex-direction:column; gap:6px; }
+  .lk-out textarea{ width:100%; min-height:110px; font:12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; border-radius:4px; border:0; padding:8px; color:#2b2430; }
+  .lk-msg{ font-size:12.5px; font-weight:600; }
+  .lk-pop{ position:absolute; z-index:1001; background:#fff; color:#2b2430; border:2px solid #2b2430; border-radius:6px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,.25); display:flex; flex-direction:column; gap:8px; font-size:13px; }
+  .lk-pop .lk-where{ font-weight:800; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:#7345a0; }
+  .lk-pop .lk-orig{ background:#f3f0f6; border-radius:4px; padding:6px 8px; }
+  .lk-pop .lk-orig b{ display:block; font-size:11.5px; color:#7345a0; }
+  .lk-pop textarea{ width:100%; min-height:64px; font:inherit; font-size:14px; line-height:1.4; border:1.5px solid #b9a2cf; border-radius:4px; padding:7px 8px; resize:vertical; }
+  .lk-pop textarea:focus{ outline:2px solid #7345a0; outline-offset:1px; }
+  .lk-pop .lk-err{ color:#b3261e; font-weight:700; }
+  .lk-pop .lk-row{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .lk-pop .lk-btn{ background:#ececec; }
+  .lk-pop .lk-btn.lk-primary{ background:#501688; color:#fff; }
+</style>
+<script>
+(function(){
+  const UI = {
+    de:{ mode:'Lektoratsmodus', lang:'Deutsch', count:n => n + (n === 1 ? ' Änderung' : ' Änderungen'),
+         hint:'Auf einen markierten Text klicken, um ihn zu korrigieren. Zum Schluss «Änderungen kopieren» und den Text als Kommentar einfügen.',
+         copy:'Änderungen kopieren', discard:'Alle verwerfen', discardSure:'Wirklich alle verwerfen?', exit:'Beenden',
+         original:'Original (Deutsch)', apply:'Übernehmen', cancel:'Abbrechen', reset:'Original wiederherstellen',
+         copied:'Kopiert. Jetzt als Kommentar im Rise Review einfügen.',
+         manual:'Automatisches Kopieren nicht möglich: Text unten markieren (Ctrl+A) und kopieren (Ctrl+C).',
+         placeholder:'Der Platzhalter {n} muss genau einmal im Text stehen (dort erscheint die Nummer).',
+         empty:'Der Text darf nicht leer sein.' },
+    fr:{ mode:'Mode relecture', lang:'Français', count:n => n + (n === 1 ? ' modification' : ' modifications'),
+         hint:'Cliquez sur un texte marqué pour le corriger. Pour terminer, cliquez sur « Copier les modifications » et collez le texte dans un commentaire.',
+         copy:'Copier les modifications', discard:'Tout annuler', discardSure:'Vraiment tout annuler ?', exit:'Quitter',
+         original:'Original (allemand)', apply:'Valider', cancel:'Annuler', reset:'Rétablir l’original',
+         copied:'Copié. Collez maintenant le texte dans un commentaire de Rise Review.',
+         manual:'Copie automatique impossible : sélectionnez le texte ci-dessous (Ctrl+A) et copiez-le (Ctrl+C).',
+         placeholder:'L’espace réservé {n} doit figurer une fois dans le texte (le numéro s’y affichera).',
+         empty:'Le texte ne peut pas être vide.' },
+    it:{ mode:'Modalità revisione', lang:'Italiano', count:n => n + (n === 1 ? ' modifica' : ' modifiche'),
+         hint:'Clicchi su un testo evidenziato per correggerlo. Alla fine clicchi su «Copia le modifiche» e incolli il testo in un commento.',
+         copy:'Copia le modifiche', discard:'Annulla tutto', discardSure:'Annullare davvero tutto?', exit:'Esci',
+         original:'Originale (tedesco)', apply:'Conferma', cancel:'Annulla', reset:'Ripristina l’originale',
+         copied:'Copiato. Ora incolli il testo in un commento di Rise Review.',
+         manual:'Copia automatica non possibile: selezioni il testo qui sotto (Ctrl+A) e lo copi (Ctrl+C).',
+         placeholder:'Il segnaposto {n} deve comparire una volta nel testo (lì apparirà il numero).',
+         empty:'Il testo non può essere vuoto.' },
+    en:{ mode:'Proofreading mode', lang:'English', count:n => n + (n === 1 ? ' change' : ' changes'),
+         hint:'Click on a marked text to correct it. When you have finished, click “Copy changes” and paste the text into a comment.',
+         copy:'Copy changes', discard:'Discard all', discardSure:'Really discard all?', exit:'Exit',
+         original:'Original (German)', apply:'Apply', cancel:'Cancel', reset:'Restore original',
+         copied:'Copied. Now paste it into a comment in Rise Review.',
+         manual:'Automatic copying is not possible: select the text below (Ctrl+A) and copy it (Ctrl+C).',
+         placeholder:'The placeholder {n} must appear exactly once in the text (the number will appear there).',
+         empty:'The text cannot be empty.' }
+  };
+  const U = UI[LANG] || UI.de;
+  const STORE = 'lektorat:' + CODE_ID + ':' + LANG;
+  let on = false, bar = null, pop = null;
+  let changes = {};   // key -> { alt, neu }
+
+  function load(){
+    try{
+      const s = JSON.parse(localStorage.getItem(STORE) || '{}');
+      Object.keys(s).forEach(k => { if(s[k] && s[k].alt === baseText(k)) changes[k] = s[k]; });
+    }catch(e){}
+  }
+  function save(){ try{ localStorage.setItem(STORE, JSON.stringify(changes)); }catch(e){} }
+
+  function label(key){
+    const L = typeof LABELS !== 'undefined' ? LABELS : {};
+    const path = key.split('.');
+    const parts = [];
+    path.forEach((seg, i) => {
+      if(/^\d+$/.test(seg)){
+        const n = Number(seg);
+        if(i > 0 && /^\d+$/.test(path[i-1])) parts.push(['links', 'rechts'][n] || 'Spalte ' + (n + 1));
+        else if(parts.length) parts[parts.length - 1] += ' ' + (n + 1);
+      } else parts.push(L[seg] || seg);
+    });
+    return parts.join(' › ');
+  }
+
+  function placeholders(t){ return (t.match(/\{\w+\}/g) || []).sort().join(); }
+
+  function mark(){
+    document.querySelectorAll('[data-key]').forEach(e => e.classList.toggle('lk-changed', on && e.dataset.key in changes));
+    if(bar) bar.querySelector('.lk-count').textContent = U.count(Object.keys(changes).length);
+    if(bar) bar.querySelector('[data-act="copy"]').disabled = !Object.keys(changes).length;
+  }
+
+  function button(text, cls, act){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'lk-btn ' + (cls || ''); b.textContent = text; b.dataset.act = act;
+    return b;
+  }
+
+  /* ---------- Leiste oben ---------- */
+  function buildBar(){
+    bar = document.createElement('div');
+    bar.className = 'lk-ui lk-bar';
+    const title = document.createElement('span'); title.className = 'lk-title'; title.textContent = U.mode + ' · ' + U.lang;
+    const count = document.createElement('span'); count.className = 'lk-count';
+    const spacer = document.createElement('span'); spacer.className = 'lk-spacer';
+    const hint = document.createElement('span'); hint.className = 'lk-hint'; hint.textContent = U.hint;
+    const out = document.createElement('div'); out.className = 'lk-out'; out.hidden = true;
+    bar.append(title, count, spacer, button(U.copy, 'lk-primary', 'copy'), button(U.discard, 'lk-ghost', 'discard'), button(U.exit, 'lk-ghost', 'exit'), hint, out);
+    bar.addEventListener('click', e => {
+      const act = e.target.dataset && e.target.dataset.act;
+      if(act === 'copy') copyChanges();
+      if(act === 'exit') toggle(false);
+      if(act === 'discard'){
+        const b = e.target;
+        if(b.dataset.sure){ changes = {}; save(); applyAll(); b.textContent = U.discard; delete b.dataset.sure; out.hidden = true; }
+        else { b.textContent = U.discardSure; b.dataset.sure = '1'; setTimeout(() => { b.textContent = U.discard; delete b.dataset.sure; }, 4000); }
+      }
+    });
+    document.body.prepend(bar);
+  }
+
+  function output(){
+    const lines = ['[[Lektorat ' + CODE_ID + ' ' + LANG + ']]'];
+    Object.keys(changes).forEach(k => lines.push('[[' + k + ' | ' + label(k) + ']] ' + changes[k].neu));
+    return lines.join('\n');
+  }
+
+  function copyChanges(){
+    const out = bar.querySelector('.lk-out');
+    out.innerHTML = '';
+    const msg = document.createElement('span'); msg.className = 'lk-msg';
+    const ta = document.createElement('textarea'); ta.readOnly = true; ta.value = output();
+    out.append(msg, ta); out.hidden = false;
+    const fallback = () => {
+      ta.focus(); ta.select();
+      let ok = false;
+      try{ ok = document.execCommand('copy'); }catch(e){}
+      msg.textContent = ok ? U.copied : U.manual;
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(ta.value).then(() => { msg.textContent = U.copied; ta.select(); }, fallback);
+    } else fallback();
+  }
+
+  /* ---------- Bearbeitungsfenster ---------- */
+  function closePop(restore){
+    if(!pop) return;
+    if(restore){
+      const k = pop.dataset.lkKey;
+      if(k in changes) OVERRIDES[k] = changes[k].neu; else delete OVERRIDES[k];
+      renderKey(k);
+    }
+    pop.remove(); pop = null;
+  }
+
+  function openPop(target){
+    closePop(true);
+    const key = target.dataset.key;
+    const base = baseText(key);
+    pop = document.createElement('div');
+    pop.className = 'lk-ui lk-pop';
+    pop.dataset.lkKey = key;
+
+    const where = document.createElement('span'); where.className = 'lk-where'; where.textContent = label(key);
+    pop.append(where);
+
+    if(LANG !== 'de'){
+      const orig = document.createElement('div'); orig.className = 'lk-orig';
+      const b = document.createElement('b'); b.textContent = U.original;
+      orig.append(b, document.createTextNode(getAtDe(key)));
+      pop.append(orig);
+    }
+
+    const ta = document.createElement('textarea');
+    ta.value = rawTextOf(key);
+    const err = document.createElement('span'); err.className = 'lk-err';
+    const row = document.createElement('div'); row.className = 'lk-row';
+    const bReset = button(U.reset, '', 'reset');
+    const bCancel = button(U.cancel, '', 'cancel');
+    const bApply = button(U.apply, 'lk-primary', 'apply');
+    row.append(bReset, bCancel, bApply);
+    pop.append(ta, err, row);
+
+    function check(){
+      const v = ta.value.replace(/\s*\n\s*/g, ' ');
+      let problem = '';
+      if(!v.trim()) problem = U.empty;
+      else if(placeholders(v) !== placeholders(base)) problem = U.placeholder;
+      err.textContent = problem;
+      bApply.disabled = !!problem;
+      return problem ? null : v.trim();
+    }
+    ta.addEventListener('input', () => {
+      const v = check();
+      if(v !== null){ OVERRIDES[key] = v; renderKey(key); }
+    });
+    ta.addEventListener('keydown', e => {
+      if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); if(!bApply.disabled) bApply.click(); }
+      if(e.key === 'Escape'){ e.preventDefault(); closePop(true); }
+    });
+    bCancel.addEventListener('click', () => closePop(true));
+    bReset.addEventListener('click', () => { ta.value = base; ta.dispatchEvent(new Event('input')); ta.focus(); });
+    bApply.addEventListener('click', () => {
+      const v = check();
+      if(v === null) return;
+      if(v === base){ delete changes[key]; delete OVERRIDES[key]; }
+      else { changes[key] = { alt:base, neu:v }; OVERRIDES[key] = v; }
+      save(); renderKey(key); closePop(false); mark();
+    });
+    check();
+
+    document.body.append(pop);
+    const r = target.getBoundingClientRect();
+    const w = Math.min(440, window.innerWidth - 16);
+    pop.style.width = w + 'px';
+    pop.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - w - 8)) + 'px';
+    pop.style.top = (r.bottom + window.scrollY + 8) + 'px';
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
+  function rawTextOf(key){ return key in changes ? changes[key].neu : baseText(key); }
+  function getAtDe(key){
+    const v = key.split('.').reduce((o, s) => (o == null ? undefined : o[/^\d+$/.test(s) ? Number(s) : s]), TEXTE.de);
+    return typeof v === 'string' ? v : '';
+  }
+
+  /* ---------- Ein / Aus ---------- */
+  function applyAll(){
+    Object.keys(OVERRIDES).forEach(k => delete OVERRIDES[k]);
+    if(on) Object.keys(changes).forEach(k => { OVERRIDES[k] = changes[k].neu; });
+    renderAll(); mark();
+  }
+
+  function toggle(state){
+    on = state === undefined ? !on : state;
+    document.body.classList.toggle('lektorat', on);
+    closePop(false);
+    if(on){ load(); if(!bar) buildBar(); bar.hidden = false; }
+    else if(bar){ bar.hidden = true; }
+    applyAll();
+  }
+
+  document.addEventListener('keydown', e => {
+    if(e.ctrlKey && e.altKey && e.code === 'KeyL'){ e.preventDefault(); toggle(); }
+  }, true);
+
+  // Im Lektoratsmodus: Klicks öffnen das Bearbeitungsfenster statt die Grafik zu bedienen
+  document.addEventListener('click', e => {
+    if(!on || e.target.closest('.lk-ui')) return;
+    e.preventDefault(); e.stopPropagation();
+    const t = e.target.closest('[data-key]');
+    if(t) openPop(t); else closePop(true);
+  }, true);
+})();
 </script>
 
 </body>
