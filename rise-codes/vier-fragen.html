@@ -13,6 +13,7 @@
 <script>
   const SPRACHE = 'de';
   const CODE_ID = 'vier-fragen';   // eindeutiger Name dieser Grafik (nicht ändern)
+  const STAND = '20.11.2026 · Erstfassung';   // wird vom Lektorats-Werkzeug gesetzt (nicht von Hand ändern)
 </script>
 
 <!-- =====================================================================
@@ -825,6 +826,7 @@ const TEXTE = {
   .lk-bar .lk-title{ font-weight:800; }
   .lk-bar .lk-count{ background:#f0a500; color:#2b2430; font-weight:800; border-radius:999px; padding:1px 9px; }
   .lk-bar .lk-hint{ flex-basis:100%; opacity:.8; font-size:12.5px; }
+  .lk-bar .lk-stand{ font-size:12.5px; font-weight:600; opacity:.85; border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:1px 9px; }
   .lk-bar .lk-spacer{ flex-basis:100%; height:0; }
   .lk-btn{ border:0; border-radius:4px; font:inherit; font-size:13px; font-weight:700; padding:7px 12px; cursor:pointer; background:#fff; color:#2b2430; }
   .lk-btn.lk-primary{ background:#f0a500; color:#2b2430; }
@@ -848,7 +850,7 @@ const TEXTE = {
 <script>
 (function(){
   const UI = {
-    de:{ mode:'Lektoratsmodus', lang:'Deutsch', count:n => n + (n === 1 ? ' Änderung' : ' Änderungen'),
+    de:{ stand:'Stand', mode:'Lektoratsmodus', lang:'Deutsch', count:n => n + (n === 1 ? ' Änderung' : ' Änderungen'),
          hint:'Auf einen markierten Text klicken, um ihn zu korrigieren. Zum Schluss «Änderungen kopieren» und den Text als Kommentar einfügen.',
          copy:'Änderungen kopieren', discard:'Alle verwerfen', discardSure:'Wirklich alle verwerfen?', exit:'Beenden',
          original:'Original (Deutsch)', apply:'Übernehmen', cancel:'Abbrechen', reset:'Original wiederherstellen',
@@ -856,7 +858,7 @@ const TEXTE = {
          manual:'Automatisches Kopieren nicht möglich: Text unten markieren (Ctrl+A) und kopieren (Ctrl+C).',
          placeholder:'Der Platzhalter {n} muss genau einmal im Text stehen (dort erscheint die Nummer).',
          empty:'Der Text darf nicht leer sein.' },
-    fr:{ mode:'Mode relecture', lang:'Français', count:n => n + (n === 1 ? ' modification' : ' modifications'),
+    fr:{ stand:'Version du', mode:'Mode relecture', lang:'Français', count:n => n + (n === 1 ? ' modification' : ' modifications'),
          hint:'Cliquez sur un texte marqué pour le corriger. Pour terminer, cliquez sur « Copier les modifications » et collez le texte dans un commentaire.',
          copy:'Copier les modifications', discard:'Tout annuler', discardSure:'Vraiment tout annuler ?', exit:'Quitter',
          original:'Original (allemand)', apply:'Valider', cancel:'Annuler', reset:'Rétablir l’original',
@@ -864,7 +866,7 @@ const TEXTE = {
          manual:'Copie automatique impossible : sélectionnez le texte ci-dessous (Ctrl+A) et copiez-le (Ctrl+C).',
          placeholder:'L’espace réservé {n} doit figurer une fois dans le texte (le numéro s’y affichera).',
          empty:'Le texte ne peut pas être vide.' },
-    it:{ mode:'Modalità revisione', lang:'Italiano', count:n => n + (n === 1 ? ' modifica' : ' modifiche'),
+    it:{ stand:'Versione del', mode:'Modalità revisione', lang:'Italiano', count:n => n + (n === 1 ? ' modifica' : ' modifiche'),
          hint:'Clicchi su un testo evidenziato per correggerlo. Alla fine clicchi su «Copia le modifiche» e incolli il testo in un commento.',
          copy:'Copia le modifiche', discard:'Annulla tutto', discardSure:'Annullare davvero tutto?', exit:'Esci',
          original:'Originale (tedesco)', apply:'Conferma', cancel:'Annulla', reset:'Ripristina l’originale',
@@ -872,7 +874,7 @@ const TEXTE = {
          manual:'Copia automatica non possibile: selezioni il testo qui sotto (Ctrl+A) e lo copi (Ctrl+C).',
          placeholder:'Il segnaposto {n} deve comparire una volta nel testo (lì apparirà il numero).',
          empty:'Il testo non può essere vuoto.' },
-    en:{ mode:'Proofreading mode', lang:'English', count:n => n + (n === 1 ? ' change' : ' changes'),
+    en:{ stand:'Version', mode:'Proofreading mode', lang:'English', count:n => n + (n === 1 ? ' change' : ' changes'),
          hint:'Click on a marked text to correct it. When you have finished, click “Copy changes” and paste the text into a comment.',
          copy:'Copy changes', discard:'Discard all', discardSure:'Really discard all?', exit:'Exit',
          original:'Original (German)', apply:'Apply', cancel:'Cancel', reset:'Restore original',
@@ -928,10 +930,12 @@ const TEXTE = {
     bar.className = 'lk-ui lk-bar';
     const title = document.createElement('span'); title.className = 'lk-title'; title.textContent = U.mode + ' · ' + U.lang;
     const count = document.createElement('span'); count.className = 'lk-count';
+    const stand = document.createElement('span'); stand.className = 'lk-stand';
+    stand.textContent = U.stand + ' ' + (typeof STAND !== 'undefined' && STAND ? STAND : '–');
     const spacer = document.createElement('span'); spacer.className = 'lk-spacer';
     const hint = document.createElement('span'); hint.className = 'lk-hint'; hint.textContent = U.hint;
     const out = document.createElement('div'); out.className = 'lk-out'; out.hidden = true;
-    bar.append(title, count, spacer, button(U.copy, 'lk-primary', 'copy'), button(U.discard, 'lk-ghost', 'discard'), button(U.exit, 'lk-ghost', 'exit'), hint, out);
+    bar.append(title, count, stand, spacer, button(U.copy, 'lk-primary', 'copy'), button(U.discard, 'lk-ghost', 'discard'), button(U.exit, 'lk-ghost', 'exit'), hint, out);
     bar.addEventListener('click', e => {
       const act = e.target.dataset && e.target.dataset.act;
       if(act === 'copy') copyChanges();

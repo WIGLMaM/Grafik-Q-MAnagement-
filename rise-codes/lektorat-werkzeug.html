@@ -93,7 +93,7 @@
   <!-- 4 -->
   <section class="card hidden" id="resultCard">
     <h2><span class="n">4</span>Kontrollieren und herunterladen</h2>
-    <p class="hint">Vorschau der korrigierten Codes. Danach die neuen Dateien herunterladen und in Rise ersetzen.</p>
+    <p class="hint">Vorschau der korrigierten Codes. Danach die neuen Dateien herunterladen, <strong>in der Ablage überschreiben</strong> und in allen Sprachkursen in Rise ersetzen. Der neue Stand ist im Code eingetragen und erscheint im Lektoratsmodus.</p>
     <div class="row" id="codeTabs"></div>
     <div class="row" id="langTabs"></div>
     <iframe id="preview" title="Vorschau"></iframe>
@@ -221,6 +221,26 @@ function replaceTexte(src, texte){
   return src.slice(0, b.start) + serializeTexte(texte) + ';' + src.slice(b.end);
 }
 
+/* Stand (Version) im Code lesen und setzen */
+const STAND_RE = /const\s+STAND\s*=\s*(['"])(.*?)\1\s*;?/;
+function readStand(src){ const m = STAND_RE.exec(src); return m ? m[2] : ''; }
+function makeStand(changes){
+  const d = new Date(), z = n => String(n).padStart(2, '0');
+  const counts = {};
+  changes.forEach(c => { counts[c.lang] = (counts[c.lang] || 0) + 1; });
+  const langs = Object.keys(counts).sort((a, b) => (LANG_ORDER.indexOf(a) + 99) % 99 - (LANG_ORDER.indexOf(b) + 99) % 99);
+  return z(d.getDate()) + '.' + z(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes())
+    + ' · ' + langs.map(l => l.toUpperCase() + ' ' + counts[l]).join(', ');
+}
+function writeStand(src, stand){
+  const line = "const STAND = '" + stand.replace(/'/g, "\\'") + "';";
+  if(STAND_RE.test(src)) return src.replace(STAND_RE, line);
+  const anchor = /(const\s+CODE_ID\s*=\s*['"][^'"]*['"]\s*;?[^\n]*\n)|(const\s+SPRACHE\s*=\s*['"][^'"]*['"]\s*;?[^\n]*\n)/.exec(src);
+  if(!anchor) return src;
+  const at = anchor.index + anchor[0].length;
+  return src.slice(0, at) + '  ' + line + '   // wird vom Lektorats-Werkzeug gesetzt (nicht von Hand ändern)\n' + src.slice(at);
+}
+
 /* =====================================================================
    Schritt 1: HTML laden
    ===================================================================== */
@@ -231,7 +251,7 @@ async function loadHtmlFiles(files){
       const texte = parseTexte(source);
       const idm = /const\s+CODE_ID\s*=\s*['"]([^'"]+)['"]/.exec(source);
       const codeId = idm ? idm[1] : f.name.replace(/\.html?$/i, '');
-      codes.set(f.name, { name:f.name, codeId, source, texte, newSource:null });
+      codes.set(f.name, { name:f.name, codeId, stand:readStand(source), source, texte, newSource:null });
     }catch(e){
       codes.set(f.name, { name:f.name, error:e.message });
     }
@@ -250,7 +270,7 @@ function renderHtmlList(){
     else{
       okCount++;
       b.className = 'ok';
-      b.textContent = 'Name: ' + c.codeId + ' · ' + flatten(c.texte.de).length + ' Texte · Sprachen: ' + langsOf(c.texte).join(', ').toUpperCase();
+      b.textContent = 'Name: ' + c.codeId + ' · Stand: ' + (c.stand || '–') + ' · ' + flatten(c.texte.de).length + ' Texte · Sprachen: ' + langsOf(c.texte).join(', ').toUpperCase();
     }
     li.append(a, b); ul.append(li);
   });
@@ -364,11 +384,12 @@ function applyEntries(entries, msgs, sourceName){
   codes.forEach(c => { c.newSource = null; });
   changedNames.forEach(n => {
     const c = codes.get(n);
-    c.newSource = replaceTexte(c.source, work.get(n));
+    c.newStand = makeStand(changes.filter(x => x.name === n));
+    c.newSource = writeStand(replaceTexte(c.source, work.get(n)), c.newStand);
     c.newTexte = work.get(n);
   });
 
-  if(changes.length) msgs.unshift({ type:'ok', text:`${changes.length} Änderung(en) in ${changedNames.size} Code(s) übernommen.` });
+  if(changes.length) msgs.unshift({ type:'ok', text:`${changes.length} Änderung(en) in ${changedNames.size} Code(s) übernommen. Neuer Stand: ` + [...changedNames].map(n => codes.get(n).codeId + ' ' + codes.get(n).newStand).join(' | ') });
   else msgs.unshift({ type:'ok', text:`Keine Änderungen gefunden: ${sourceName} entspricht den geladenen Codes.` });
 
   showMessages(msgs);
