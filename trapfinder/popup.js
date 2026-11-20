@@ -9,6 +9,7 @@ const KINDS = [
   { id: 'Storyline', label: 'Storyline (SL)' },
   { id: 'Szenario', label: 'Szenario' },
   { id: 'Dokument', label: 'PDF/Word-Dateien' },
+  { id: 'Video', label: 'Videos' },
 ];
 const kindLabel = (k) => (KINDS.find((x) => x.id === k) || {}).label || k;
 let selected = new Set(KINDS.map((k) => k.id));
@@ -293,7 +294,7 @@ th{background:#f6f8fa}code{font-size:12px;word-break:break-all;white-space:pre-w
   if (Array.isArray(stored)) {
     selected = new Set(stored.filter((k) => KINDS.some((x) => x.id === k)));
     // Neu hinzugekommene Kategorien standardmässig aktivieren
-    const known = Array.isArray(knownKinds) ? knownKinds : ['Embed', 'Code-/HTML-Block', 'Custom Block', 'Storyline', 'Szenario'];
+    const known = Array.isArray(knownKinds) ? knownKinds : ['Embed', 'Code-/HTML-Block', 'Custom Block', 'Storyline', 'Szenario', 'Dokument'];
     KINDS.forEach((k) => { if (!known.includes(k.id)) selected.add(k.id); });
   }
   renderFilters();

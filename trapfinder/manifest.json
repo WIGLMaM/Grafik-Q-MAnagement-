@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TrapFinder",
-  "version": "2.3.0",
-  "description": "Findet HTML-/Code-/Embed-, Custom-, Storyline- und Szenario-Blöcke sowie PDF/Word-Dateien in Articulate-Rise-Kursen, springt per Klick dorthin und erstellt ein Protokoll.",
+  "version": "2.4.0",
+  "description": "Findet HTML-/Code-/Embed-, Custom-, Storyline- und Szenario-Blöcke sowie PDF/Word-Dateien und Videos in Articulate-Rise-Kursen, springt per Klick dorthin und erstellt ein Protokoll.",
   "action": {
     "default_title": "TrapFinder",
     "default_popup": "popup.html",

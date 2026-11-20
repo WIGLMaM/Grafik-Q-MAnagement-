@@ -2,7 +2,7 @@
 // Stellt window.__riseHtmlFinder mit scan(), crawl() und goTo() bereit.
 (() => {
   // Bei neuer Version der Erweiterung den alten Scanner in der Seite ersetzen
-  const VERSION = '2.3.0';
+  const VERSION = '2.4.0';
   if (window.__riseHtmlFinder && window.__riseHtmlFinder.version === VERSION) return;
 
   // Tags, die in normalem Rise-Text nicht vorkommen und auf manuell eingebauten Code hinweisen.
@@ -295,6 +295,41 @@
     return [...files.entries()].map(([name, url]) => ({ name, url }));
   }
 
+  const VIDEO_EXT = /\.(mp4|m4v|mov|webm|ogv|avi|mkv|wmv)(?=$|[?#"'\s])/i;
+  const VIDEO_HOST = /(youtube\.com|youtu\.be|vimeo\.com|wistia\.(com|net)|loom\.com|vidyard\.com|kaltura\.com|brightcove|dailymotion\.com|microsoftstream|stream\.microsoft)/i;
+
+  // Videos eines Blocks finden (Video-Block, Video-Medien in anderen Blöcken, Video-Dateien/-Links)
+  function findVideos(block, typeStr) {
+    const strings = allStrings(block);
+    const videoBlock = /video/i.test(typeStr);
+    const found = new Map(); // Gruppe (Pfad des Video-Objekts) -> { name, url }
+    for (const { key, path, value } of strings) {
+      if (value.length > 2000) continue;
+      const v = value.trim();
+      const m = path.match(/^(.*\bvideo)\b/i);
+      const group = m ? m[1] : null;
+      const isFile = VIDEO_EXT.test(v);
+      const isHost = /^https?:/i.test(v) && VIDEO_HOST.test(v);
+      if (!group && !isFile && !(isHost && videoBlock)) continue;
+      const g = group || v;
+      const entry = found.get(g) || { name: '', url: '' };
+      if (/^(originalName|originalFilename|fileName|filename|name|title)$/i.test(key) && !/^https?:|[\\/]/.test(v) && v) {
+        entry.name = entry.name || stripHtml(v);
+      } else if (/^https?:|^\//i.test(v) && (isFile || isHost || /^(src|url|originalUrl|embedUrl)$/i.test(key))) {
+        entry.url = entry.url || v;
+      } else if (isFile) {
+        entry.name = entry.name || fileBase(v);
+      } else if (!group) continue;
+      found.set(g, entry);
+    }
+    const list = [...found.values()].filter((e) => e.name || e.url);
+    if (!list.length && videoBlock) return [{ name: '', url: '' }];
+    return list.map((e) => ({
+      name: e.name || (VIDEO_EXT.test(e.url) ? fileBase(e.url) : e.url ? `Video auf ${hostOf(e.url).replace(/^www\./, '')}` : ''),
+      url: e.url,
+    }));
+  }
+
   // Name der Storyline-Datei/-Projekt aus den Blockdaten
   function storylineInfo(block) {
     const strings = allStrings(block);
@@ -355,6 +390,23 @@
         urls,
         preview: String(codeSource).replace(/\s+/g, ' ').trim().slice(0, 400),
       });
+    }
+
+    const primary = out[0] && out[0].kind;
+    if (!storyline && primary !== 'Embed' && primary !== 'Code-/HTML-Block') {
+      const videos = findVideos(block, typeStr);
+      if (videos.length) {
+        const title = ['title', 'heading', 'caption'].map((k) => textOf(block[k])).find(Boolean) || '';
+        out.push({
+          kind: 'Video',
+          blockType: typeStr || '–',
+          name: videos.map((v) => v.name).filter(Boolean).join(', ') || title || 'Video (ohne Titel)',
+          nameFromData: true,
+          storyUrl: '',
+          urls: videos.map((v) => v.url).filter(Boolean).slice(0, 10),
+          preview: videos.map((v) => v.name || v.url).filter(Boolean).join(' | '),
+        });
+      }
     }
 
     if (!storyline) {
@@ -459,6 +511,11 @@
         blockId: b.getAttribute('data-block-id'), blockNo: i + 1, url: lessonUrl(lesson.id),
         blockType: 'aus Seitenansicht erkannt', nameFromData: false, storyUrl: '',
       };
+      const vids = [...b.querySelectorAll('video, video source')].map((v) => v.currentSrc || v.src || v.getAttribute('src') || '').filter(Boolean);
+      if (b.querySelector('video')) {
+        out.push({ ...base, kind: 'Video', name: [...new Set(vids.map(fileBase))].join(', ') || 'Video', nameFromData: true,
+          urls: [...new Set(vids)].filter((u) => !u.startsWith('blob:')).slice(0, 5), preview: vids.join(' | ') });
+      }
       const docs = [...b.querySelectorAll('a[href]')].filter((a) => DOC_EXT.test(a.getAttribute('href')));
       if (docs.length) {
         const names = [...new Set(docs.map((a) => a.getAttribute('download') || fileBase(a.getAttribute('href'))))];

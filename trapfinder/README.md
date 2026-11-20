@@ -37,6 +37,7 @@ erstellt ein Protokoll (HTML oder CSV).
 | Storyline (SL) | Storyline-Blöcke bzw. Blöcke, die auf `story.html` verweisen |
 | Szenario | Rise-Szenario-Blöcke |
 | PDF/Word-Dateien | Anhänge sowie Links auf `.pdf`, `.doc`, `.docx`, `.dotx`, `.rtf`, `.odt` (auch in Text und Buttons) |
+| Videos | Rise-Videoblöcke, Videos in anderen Blöcken (z. B. Akkordeon, Tabs) sowie Video-Dateien und -Links (YouTube, Vimeo usw.) |
 
 Bei Storyline-Blöcken wird der Name der Storyline angezeigt. Fehlt er in den Kursdaten,
 liest die Erweiterung den Titel aus der veröffentlichten `story.html`.
