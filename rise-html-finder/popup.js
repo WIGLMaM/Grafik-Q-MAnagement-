@@ -82,6 +82,9 @@ async function scan() {
       state = { result: null, frameId: withLinks[0].frameId, lessonLinks: withLinks[0].result.lessonLinks };
       setStatus(`Keine Kursdaten gefunden, aber <strong>${withLinks[0].result.lessonLinks}</strong> Lektionen in der Navigation.`);
       $('fallback').hidden = false;
+    } else if (frames.some((f) => f.result.authoring)) {
+      setStatus('Im Rise-Editor wurden noch keine Kursdaten gefunden. Lade die Seite einmal neu (F5) und scanne dann erneut. ' +
+        'Klappt es weiterhin nicht: Öffne <strong>Preview</strong> und scanne dort, oder klicke unten auf «Diagnose».');
     } else {
       setStatus('Auf dieser Seite wurde kein Rise-Kurs erkannt. Öffne den Kurs-Link (z.&nbsp;B. den Freigabe-Link) und versuche es erneut.');
     }
@@ -128,7 +131,12 @@ function render() {
           '. Klick auf einen Eintrag springt dorthin.'
         : `Keine passenden Blöcke in ${r.lessonCount} Lektionen gefunden` +
           (r.items.length ? ` (${r.items.length} in anderen Kategorien)` : '') + '.') +
-      (r.source === 'dom' ? '<br><em>Quelle: Seitenansicht (Kapitel nicht verfügbar)</em>' : '')
+      (r.source === 'dom' ? '<br><em>Quelle: Seitenansicht (Kapitel nicht verfügbar)</em>' : '') +
+      (r.source === 'data' && r.lessonsWithContent === 0
+        ? '<br><strong>Achtung:</strong> Die Kursstruktur wurde gefunden, die Blockinhalte aber nicht. Öffne <strong>Preview</strong> und scanne dort.'
+        : r.source === 'data' && r.lessonsWithContent < r.lessonCount
+        ? `<br><em>Inhalte von ${r.lessonsWithContent} der ${r.lessonCount} Lektionen geladen. Für alle Lektionen: in der Preview scannen.</em>`
+        : '')
   );
   $('actions').hidden = n === 0;
 
@@ -164,6 +172,22 @@ async function goTo(it) {
     // Frame nicht mehr erreichbar (z. B. Seite neu geladen) – Lektion direkt öffnen.
     if (state.frameId === 0) await chrome.tabs.update(tab.id, { url: it.url });
     else setStatus('Die Kursseite wurde neu geladen. Bitte erneut scannen.');
+  }
+}
+
+async function diagnose() {
+  $('diagBox').hidden = false;
+  $('diagText').value = 'Sammle Informationen …';
+  try {
+    const target = await inject();
+    const frames = await run(target, 'diagnose');
+    const out = {
+      version: chrome.runtime.getManifest().version,
+      frames: frames.map((f) => ({ frameId: f.frameId, ...(f.result || {}) })),
+    };
+    $('diagText').value = JSON.stringify(out, null, 1);
+  } catch (e) {
+    $('diagText').value = 'Fehler: ' + e.message;
   }
 }
 
@@ -225,6 +249,11 @@ th{background:#f6f8fa}code{font-size:12px;word-break:break-all;white-space:pre-w
   $('crawl').addEventListener('click', crawl);
   $('exportCsv').addEventListener('click', exportCsv);
   $('exportHtml').addEventListener('click', exportHtml);
+  $('diagnose').addEventListener('click', diagnose);
+  $('diagCopy').addEventListener('click', async () => {
+    await navigator.clipboard.writeText($('diagText').value);
+    $('diagCopy').textContent = 'Kopiert ✓';
+  });
   $('toggleAll').addEventListener('click', () => {
     selected = selected.size === KINDS.length ? new Set() : new Set(KINDS.map((k) => k.id));
     onFilterChange();

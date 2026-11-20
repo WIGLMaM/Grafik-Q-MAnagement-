@@ -31,7 +31,15 @@
       .trim();
 
   const baseUrl = () => location.href.split('#')[0];
-  const lessonUrl = (id) => `${baseUrl()}#/lessons/${id}`;
+  const isAuthoring = () => /\/authoring\//.test(location.pathname);
+
+  // Link zu einer Lektion: im Editor aus der Seite übernehmen, im Kurs-Player per Hash.
+  function lessonLink(id) {
+    const a = id && document.querySelector(`a[href*="${CSS.escape(id)}"]`);
+    if (a) return a.href;
+    return isAuthoring() ? location.href : `${baseUrl()}#/lessons/${id}`;
+  }
+  const lessonUrl = lessonLink;
 
   // ---------- Kursdaten finden ----------
 
@@ -85,7 +93,27 @@
     return null;
   }
 
+  // Kurs aus den mitgelesenen Serverantworten (capture.js) zusammensetzen.
+  function courseFromCapture() {
+    const cap = window.__riseCapture;
+    if (!cap) return null;
+    const lessons = cap.lessons || {};
+    const course = cap.courses.slice().sort((a, b) => b.lessons.length - a.lessons.length)[0];
+    if (course) {
+      return {
+        ...course,
+        lessons: course.lessons.map((l) =>
+          l && (!Array.isArray(l.items) || !l.items.length) && lessons[l.id] ? { ...l, items: lessons[l.id].items } : l
+        ),
+      };
+    }
+    const list = Object.values(lessons);
+    return list.length ? { title: document.title, lessons: list } : null;
+  }
+
   function findCourse() {
+    const captured = courseFromCapture();
+    if (captured && captured.lessons.some((l) => l && Array.isArray(l.items) && l.items.length)) return captured;
     const seen = new WeakSet();
 
     // 1) Bekannte globale Variablen (Rise-Export: window.courseData als Base64-JSON)
@@ -123,7 +151,7 @@
         if (c) return c;
       }
     }
-    return null;
+    return captured;
   }
 
   // ---------- Blöcke analysieren ----------
@@ -237,8 +265,8 @@
 
   function lessonLinks() {
     const map = new Map();
-    for (const a of document.querySelectorAll('a[href*="#/lessons/"]')) {
-      const m = (a.getAttribute('href') || '').match(/#\/lessons\/([^/?#]+)/);
+    for (const a of document.querySelectorAll('a[href*="#/lessons/"], a[href*="/lesson/"], a[href*="/lessons/"]')) {
+      const m = (a.getAttribute('href') || '').match(/\/lessons?\/([^/?#]+)/);
       if (m && !map.has(m[1])) map.set(m[1], stripHtml(a.textContent) || m[1]);
     }
     return [...map.entries()].map(([id, title]) => ({ id, title }));
@@ -255,10 +283,12 @@
         courseTitle: stripHtml(course.title) || document.title,
         baseUrl: baseUrl(),
         lessonCount: (course.lessons || []).filter((l) => l && l.type !== 'section').length,
+        lessonsWithContent: (course.lessons || []).filter((l) => l && Array.isArray(l.items) && l.items.length).length,
+        authoring: isAuthoring(),
         items,
       };
     }
-    return { source: 'none', courseTitle: document.title, baseUrl: baseUrl(), lessonLinks: lessonLinks().length, items: [] };
+    return { source: 'none', authoring: isAuthoring(), courseTitle: document.title, baseUrl: baseUrl(), lessonLinks: lessonLinks().length, items: [] };
   }
 
   async function scrollThrough() {
@@ -334,9 +364,15 @@
   }
 
   async function goTo(lessonId, blockId) {
-    if (lessonId && !location.hash.includes(lessonId)) location.hash = `#/lessons/${lessonId}`;
+    if (lessonId && !location.href.includes(lessonId)) {
+      const a = document.querySelector(`a[href*="${CSS.escape(lessonId)}"]`);
+      if (a) a.click();
+      else if (!isAuthoring()) location.hash = `#/lessons/${lessonId}`;
+      else return false;
+    }
     if (!blockId) return true;
-    const sel = `[data-block-id="${CSS.escape(blockId)}"]`;
+    const id = CSS.escape(blockId);
+    const sel = `[data-block-id="${id}"], [data-id="${id}"], [id="${id}"], [id$="${id}"]`;
     let el = await waitFor(() => document.querySelector(sel), 5000);
     if (!el) {
       // Rise lädt Blöcke teils erst beim Scrollen – schrittweise nach unten scrollen.
@@ -353,5 +389,40 @@
     return !!el;
   }
 
-  window.__riseHtmlFinder = { scan, crawl, goTo };
+  // Strukturinfos zur Fehlersuche – ohne Kursinhalte.
+  function diagnose() {
+    const cap = window.__riseCapture;
+    let std = new Set();
+    try {
+      const f = document.createElement('iframe');
+      f.style.display = 'none';
+      document.documentElement.appendChild(f);
+      std = new Set(Object.keys(f.contentWindow));
+      f.remove();
+    } catch (_) { /* ignore */ }
+    const dataAttrs = new Set();
+    for (const el of document.querySelectorAll('*')) {
+      for (const at of el.attributes) if (at.name.startsWith('data-')) dataAttrs.add(at.name);
+      if (dataAttrs.size > 60) break;
+    }
+    const hrefs = [...document.querySelectorAll('a[href]')]
+      .map((a) => a.getAttribute('href').replace(/[A-Za-z0-9_-]{12,}/g, '…'))
+      .filter((h, i, arr) => arr.indexOf(h) === i)
+      .slice(0, 25);
+    return {
+      url: location.origin + location.pathname.replace(/[A-Za-z0-9_-]{12,}/g, '…'),
+      hash: location.hash.replace(/[A-Za-z0-9_-]{12,}/g, '…'),
+      frame: window === window.top ? 'top' : 'iframe',
+      captureAktiv: !!cap,
+      gefundeneKurse: cap ? cap.courses.map((c) => ({ lektionen: c.lessons.length, keys: Object.keys(c).slice(0, 15), lektionKeys: Object.keys(c.lessons[0] || {}) })) : [],
+      lektionenMitBloecken: cap ? Object.keys(cap.lessons).length : 0,
+      anfragen: cap ? cap.log.map((l) => ({ ...l, url: l.url.replace(/[A-Za-z0-9_-]{12,}/g, '…') })) : [],
+      globaleVariablen: Object.keys(window).filter((k) => !std.has(k)).slice(0, 60),
+      dataAttribute: [...dataAttrs],
+      links: hrefs,
+      iframes: [...document.querySelectorAll('iframe')].map((f) => (f.src || '').replace(/[A-Za-z0-9_-]{12,}/g, '…')).slice(0, 10),
+    };
+  }
+
+  window.__riseHtmlFinder = { scan, crawl, goTo, diagnose };
 })();

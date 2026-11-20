@@ -15,7 +15,9 @@ erstellt ein Protokoll (HTML oder CSV).
 
 ## Bedienung
 
-1. Den Rise-Kurs-Link öffnen (Freigabe-Link, Review-Link oder veröffentlichter Kurs).
+1. Den Rise-Kurs öffnen: im Editor (`rise.articulate.com/authoring/…`), in der Preview,
+   über den Freigabe-/Review-Link oder als veröffentlichten Kurs.
+   Im Editor nach dem Installieren oder Aktualisieren der Erweiterung die Seite einmal neu laden (F5).
 2. Auf das Erweiterungssymbol klicken, unter **Suchen nach** die gewünschten
    Kategorien anhaken und auf **Kurs scannen** klicken. Die Auswahl bleibt gespeichert
    und lässt sich auch nach dem Scan ändern. Die Zahl in Klammern zeigt die Treffer je Kategorie.
@@ -38,3 +40,9 @@ erstellt ein Protokoll (HTML oder CSV).
 Die Erweiterung liest zuerst die Kursdaten der Seite (mit Kapiteln). Klappt das nicht,
 kann sie sich über **Lektionen durchsuchen** durch alle Lektionen klicken und die
 Seite selbst untersuchen (ohne Kapitelangabe).
+
+## Wenn nichts gefunden wird
+
+Unten im Popup auf **Diagnose** klicken und den Text kopieren. Er enthält nur die
+technische Struktur der Seite (Adressen gekürzt, keine Kursinhalte) und hilft,
+die Erkennung anzupassen.
