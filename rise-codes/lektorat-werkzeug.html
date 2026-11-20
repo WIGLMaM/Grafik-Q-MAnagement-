@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lektorats-Werkzeug</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --purple-950:#501688; --purple-800:#7345a0; --purple-300:#b9a2cf; --purple-100:#dcd0e7;
+    --bg:#f4f2f6; --ink:#2b2430; --muted:#6b6272; --ok:#1f7a4d; --warn:#a15c00; --err:#b3261e;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);line-height:1.5;}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 16px 60px;}
+  h1{color:var(--purple-950);font-size:26px;margin:0 0 4px;}
+  .lead{color:var(--muted);margin:0 0 24px;}
+  .card{background:#fff;border:1px solid var(--purple-100);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+  .card h2{font-size:17px;margin:0 0 4px;color:var(--purple-950);display:flex;gap:10px;align-items:center;}
+  .card h2 .n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--purple-950);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;}
+  .card p.hint{margin:0 0 14px;color:var(--muted);font-size:14px;}
+  .drop{display:block;border:2px dashed var(--purple-300);border-radius:var(--radius);padding:18px;text-align:center;color:var(--purple-800);font-weight:600;cursor:pointer;background:#faf8fc;}
+  .drop.over{background:var(--purple-100);}
+  .drop input{display:none;}
+  button.main{border:0;border-radius:var(--radius);background:var(--purple-950);color:#fff;font:inherit;font-weight:700;padding:10px 16px;cursor:pointer;}
+  button.main:hover{background:var(--purple-800);}
+  button.main:disabled{background:#c9c2cf;cursor:not-allowed;}
+  button.small{border:1px solid var(--purple-300);background:#fff;color:var(--purple-950);border-radius:var(--radius);font:inherit;font-size:13px;font-weight:600;padding:6px 10px;cursor:pointer;}
+  button.small.active{background:var(--purple-950);color:#fff;border-color:var(--purple-950);}
+  ul.files{list-style:none;padding:0;margin:12px 0 0;}
+  ul.files li{padding:6px 10px;border-radius:4px;background:var(--bg);margin-bottom:4px;font-size:14px;display:flex;justify-content:space-between;gap:10px;}
+  .ok{color:var(--ok);} .warn{color:var(--warn);} .err{color:var(--err);}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--purple-100);vertical-align:top;}
+  th{background:var(--bg);font-weight:700;}
+  td.old{color:var(--muted);text-decoration:line-through;}
+  td.new{color:var(--ok);font-weight:600;}
+  .msgs{margin:10px 0 0;padding:0;list-style:none;font-size:14px;}
+  .msgs li{padding:6px 10px;border-radius:4px;margin-bottom:4px;}
+  .msgs li.warn{background:#fff4e0;} .msgs li.err{background:#fde8e6;} .msgs li.ok{background:#e6f4ec;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+  iframe{width:100%;height:640px;border:1px solid var(--purple-100);border-radius:var(--radius);margin-top:10px;background:#ececec;}
+  .hidden{display:none;}
+  .table-scroll{overflow-x:auto;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lektorats-Werkzeug für Rise-Codes</h1>
+  <p class="lead">Texte aus den HTML-Codes als Excel an die Lektoren geben und die Korrekturen wieder zurückschreiben. Alles läuft lokal im Browser, es werden keine Dateien hochgeladen.</p>
+
+  <!-- 1 -->
+  <section class="card">
+    <h2><span class="n">1</span>HTML-Codes laden</h2>
+    <p class="hint">Einen oder mehrere Codes hierher ziehen oder anklicken. Die Codes müssen den Sprachblock <code>const TEXTE = { … }</code> enthalten.</p>
+    <label class="drop" id="dropHtml">HTML-Dateien hierher ziehen oder klicken
+      <input type="file" id="inHtml" accept=".html,.htm" multiple>
+    </label>
+    <ul class="files" id="listHtml"></ul>
+  </section>
+
+  <!-- 2 -->
+  <section class="card">
+    <h2><span class="n">2</span>Excel für das Lektorat erstellen</h2>
+    <p class="hint">Erzeugt eine Excel-Datei mit einer Zeile pro Text und einer Spalte pro Sprache. Diese Datei geht an die Lektoren.</p>
+    <button class="main" id="btnExport" disabled>Excel erstellen</button>
+  </section>
+
+  <!-- 3 -->
+  <section class="card">
+    <h2><span class="n">3</span>Korrigiertes Excel einlesen</h2>
+    <p class="hint">Die zurückgeschickte Excel-Datei hierher ziehen. Die passenden HTML-Codes müssen in Schritt 1 geladen sein.</p>
+    <label class="drop" id="dropXlsx">Excel-Datei hierher ziehen oder klicken
+      <input type="file" id="inXlsx" accept=".xlsx">
+    </label>
+    <ul class="msgs" id="msgs"></ul>
+    <div id="changesBox" class="hidden">
+      <div class="table-scroll">
+        <table id="changes"><thead><tr><th>Code</th><th>Stelle</th><th>Sprache</th><th>Bisher</th><th>Neu</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="card hidden" id="resultCard">
+    <h2><span class="n">4</span>Kontrollieren und herunterladen</h2>
+    <p class="hint">Vorschau der korrigierten Codes. Danach die neuen Dateien herunterladen und in Rise ersetzen.</p>
+    <div class="row" id="codeTabs"></div>
+    <div class="row" id="langTabs"></div>
+    <iframe id="preview" title="Vorschau"></iframe>
+    <div class="row" id="downloads"></div>
+  </section>
+</div>
+
+<script>
+/* =====================================================================
+   Grundlagen
+   ===================================================================== */
+const LANG_NAMES = { de:'Deutsch (Original)', fr:'Français (CH)', it:'Italiano (CH)', en:'English (UK)' };
+const LANG_BANNER = { de:'DEUTSCH', fr:'FRANÇAIS (CH)', it:'ITALIANO (CH)', en:'ENGLISH (UK)' };
+const LANG_ORDER = ['de','fr','it','en'];
+
+// Lesbare Namen für die Spalte «Stelle». Unbekannte Schlüssel erscheinen unverändert.
+const LABELS = {
+  seitentitel:'Seitentitel (Browser-Tab)', titel:'Titel', intro:'Einleitung', anleitung:'Anleitung',
+  start:'Beschriftung Start', frageVon:'Zähler «Frage x von 4»', weiterZu:'Button «Weiter»',
+  zumKeller:'Button «Keller»', fragen:'Frage', zeilen:'Zeile', frage:'Fragetext', stichwort:'Stichwort',
+  fazit:'Fazit', kellerTitel:'Keller: Titel', kellerText:'Keller: Text'
+};
+
+const codes = new Map();   // Dateiname -> { name, source, texte, newSource }
+
+function $(id){ return document.getElementById(id); }
+
+/* Sprachblock «const TEXTE = {...}» im Code finden (Strings und Kommentare werden übersprungen) */
+function findTexteBlock(src){
+  const m = /const\s+TEXTE\s*=\s*/.exec(src);
+  if(!m) return null;
+  let i = m.index + m[0].length;
+  if(src[i] !== '{') return null;
+  const start = i;
+  let depth = 0;
+  for(; i < src.length; i++){
+    const c = src[i];
+    if(c === '"' || c === "'" || c === '`'){
+      const q = c; i++;
+      while(i < src.length && src[i] !== q){ if(src[i] === '\\') i++; i++; }
+    } else if(c === '/' && src[i+1] === '/'){
+      while(i < src.length && src[i] !== '\n') i++;
+    } else if(c === '/' && src[i+1] === '*'){
+      i = src.indexOf('*/', i + 2) + 1;
+      if(i === 0) return null;
+    } else if(c === '{' || c === '['){ depth++; }
+    else if(c === '}' || c === ']'){
+      depth--;
+      if(depth === 0){
+        let end = i + 1;
+        if(src[end] === ';') end++;
+        return { declStart:m.index, start, end, literal:src.slice(start, i + 1) };
+      }
+    }
+  }
+  return null;
+}
+
+function parseTexte(src){
+  const b = findTexteBlock(src);
+  if(!b) throw new Error('Kein Sprachblock «const TEXTE = { … }» gefunden.');
+  const obj = new Function('"use strict"; return (' + b.literal + ');')();
+  if(!obj || !obj.de) throw new Error('Der Sprachblock enthält keine deutschen Texte (de).');
+  return obj;
+}
+
+/* Alle Texte als Liste: [{ id:'fragen.1.zeilen.2.0', path:[...], de:'…' }] */
+function flatten(node, path = [], out = []){
+  if(typeof node === 'string'){ out.push({ id:path.join('.'), path }); }
+  else if(Array.isArray(node)){ node.forEach((v, i) => flatten(v, path.concat(i), out)); }
+  else if(node && typeof node === 'object'){ Object.keys(node).forEach(k => flatten(node[k], path.concat(k), out)); }
+  return out;
+}
+
+function getAt(obj, path){ return path.reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+function setAt(obj, path, value){
+  let o = obj;
+  for(let i = 0; i < path.length - 1; i++){
+    const k = path[i];
+    if(o[k] == null) o[k] = typeof path[i+1] === 'number' ? [] : {};
+    o = o[k];
+  }
+  o[path[path.length - 1]] = value;
+}
+
+function label(path){
+  const parts = [];
+  path.forEach((seg, i) => {
+    if(typeof seg === 'number'){
+      if(i > 0 && typeof path[i-1] === 'number'){ parts.push(['links (fett)', 'rechts'][seg] || 'Spalte ' + (seg + 1)); }
+      else if(parts.length){ parts[parts.length - 1] += ' ' + (seg + 1); }
+      else parts.push(String(seg + 1));
+    } else {
+      parts.push(LABELS[seg] || seg);
+    }
+  });
+  return parts.join(' › ');
+}
+
+function langsOf(texte){
+  const ks = Object.keys(texte);
+  return LANG_ORDER.filter(l => ks.includes(l)).concat(ks.filter(l => !LANG_ORDER.includes(l)));
+}
+
+/* Sprachblock wieder als lesbaren Code schreiben */
+function q(s){ return "'" + s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'"; }
+function ser(v, ind){
+  const pad = '  '.repeat(ind), pad1 = '  '.repeat(ind + 1);
+  if(typeof v === 'string') return q(v);
+  if(Array.isArray(v)){
+    if(v.every(x => typeof x === 'string')) return '[' + v.map(q).join(', ') + ']';
+    return '[\n' + v.map(x => pad1 + ser(x, ind + 1)).join(',\n') + '\n' + pad + ']';
+  }
+  const keys = Object.keys(v);
+  return '{\n' + keys.map(k => pad1 + (/^[A-Za-z_$][\w$]*$/.test(k) ? k : q(k)) + ': ' + ser(v[k], ind + 1)).join(',\n') + '\n' + pad + '}';
+}
+function serializeTexte(texte){
+  const langs = langsOf(texte);
+  return '{\n' + langs.map(l =>
+    '\n  /* ' + '-'.repeat(28) + ' ' + (LANG_BANNER[l] || l.toUpperCase()) + ' ' + '-'.repeat(28) + ' */\n  ' + l + ': ' + ser(texte[l], 1)
+  ).join(',\n') + '\n}';
+}
+function replaceTexte(src, texte){
+  const b = findTexteBlock(src);
+  return src.slice(0, b.start) + serializeTexte(texte) + ';' + src.slice(b.end);
+}
+
+/* =====================================================================
+   Schritt 1: HTML laden
+   ===================================================================== */
+async function loadHtmlFiles(files){
+  for(const f of files){
+    const source = await f.text();
+    try{
+      const texte = parseTexte(source);
+      codes.set(f.name, { name:f.name, source, texte, newSource:null });
+    }catch(e){
+      codes.set(f.name, { name:f.name, error:e.message });
+    }
+  }
+  renderHtmlList();
+}
+
+function renderHtmlList(){
+  const ul = $('listHtml'); ul.innerHTML = '';
+  let okCount = 0;
+  codes.forEach(c => {
+    const li = document.createElement('li');
+    const a = document.createElement('span'); a.textContent = c.name;
+    const b = document.createElement('span');
+    if(c.error){ b.className = 'err'; b.textContent = c.error; }
+    else{
+      okCount++;
+      b.className = 'ok';
+      b.textContent = flatten(c.texte.de).length + ' Texte · Sprachen: ' + langsOf(c.texte).join(', ').toUpperCase();
+    }
+    li.append(a, b); ul.append(li);
+  });
+  $('btnExport').disabled = okCount === 0;
+}
+
+/* =====================================================================
+   Schritt 2: Excel erstellen
+   ===================================================================== */
+function exportExcel(){
+  const valid = [...codes.values()].filter(c => !c.error);
+  const allLangs = [...new Set(valid.flatMap(c => langsOf(c.texte)))];
+  allLangs.sort((a, b) => (LANG_ORDER.indexOf(a) + 99) % 99 - (LANG_ORDER.indexOf(b) + 99) % 99);
+
+  const header = ['Code', 'ID (bitte nicht ändern)', 'Stelle'].concat(allLangs.map(l => (LANG_NAMES[l] || l) + ' [' + l + ']'));
+  const rows = [header];
+  valid.forEach(c => {
+    flatten(c.texte.de).forEach(t => {
+      rows.push([c.name, t.id, label(t.path)].concat(allLangs.map(l => {
+        const v = getAt(c.texte[l], t.path);
+        return typeof v === 'string' ? v : '';
+      })));
+    });
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{ wch:20 }, { wch:16 }, { wch:28 }].concat(allLangs.map(() => ({ wch:48 })));
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:rows.length - 1, c:header.length - 1 } }) };
+
+  const anleitung = [
+    ['Anleitung für das Lektorat'],
+    [''],
+    ['1. Wechseln Sie zum Blatt «Texte».'],
+    ['2. Korrigieren Sie nur die Spalte Ihrer Sprache.'],
+    ['3. Die Spalten «Code», «ID» und «Stelle» bitte nicht verändern und keine Zeilen löschen oder einfügen.'],
+    ['4. Platzhalter wie {n} müssen im Text stehen bleiben (dort erscheint später eine Zahl).'],
+    ['5. Wie die Texte im Kurs aussehen, sehen Sie im Rise Review.'],
+    ['6. Speichern Sie die Datei als .xlsx und schicken Sie sie zurück.'],
+    [''],
+    ['Instructions for proofreaders / Instructions pour la relecture / Istruzioni per la revisione'],
+    ['Only edit the column of your language. Do not change the columns «Code», «ID» and «Stelle», and keep placeholders such as {n}.'],
+    ['Modifiez uniquement la colonne de votre langue. Ne changez pas les colonnes «Code», «ID» et «Stelle» et conservez les espaces réservés comme {n}.'],
+    ['Modifichi solo la colonna della Sua lingua. Non cambi le colonne «Code», «ID» e «Stelle» e mantenga i segnaposto come {n}.']
+  ];
+  const wsA = XLSX.utils.aoa_to_sheet(anleitung);
+  wsA['!cols'] = [{ wch:120 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsA, 'Anleitung');
+  XLSX.utils.book_append_sheet(wb, ws, 'Texte');
+
+  const base = valid.length === 1 ? valid[0].name.replace(/\.html?$/i, '') : 'Rise-Codes';
+  XLSX.writeFile(wb, 'Lektorat_' + base + '.xlsx');
+}
+
+/* =====================================================================
+   Schritt 3: Excel einlesen
+   ===================================================================== */
+async function importExcel(file){
+  const msgs = [];
+  const changes = [];
+  const wb = XLSX.read(await file.arrayBuffer(), { type:'array' });
+  const ws = wb.Sheets['Texte'] || wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
+  const header = rows[0] || [];
+
+  const langCols = {};
+  header.forEach((h, i) => { const m = /\[([a-z]{2,3})\]\s*$/.exec(String(h)); if(m) langCols[m[1]] = i; });
+  const colCode = header.findIndex(h => String(h).trim() === 'Code');
+  const colId = header.findIndex(h => String(h).startsWith('ID'));
+
+  if(colCode < 0 || colId < 0 || !Object.keys(langCols).length){
+    showMessages([{ type:'err', text:'Diese Excel-Datei stammt nicht aus dem Werkzeug (Spalten «Code», «ID» oder Sprachspalten fehlen).' }]);
+    return;
+  }
+
+  // Arbeitskopien der Texte
+  const work = new Map();
+  codes.forEach(c => { if(!c.error) work.set(c.name, JSON.parse(JSON.stringify(c.texte))); });
+  const missingCodes = new Set();
+
+  for(let r = 1; r < rows.length; r++){
+    const row = rows[r];
+    const name = String(row[colCode] || '').trim();
+    const id = String(row[colId] || '').trim();
+    if(!name && !id) continue;
+    const texte = work.get(name);
+    if(!texte){ missingCodes.add(name); continue; }
+    const path = id.split('.').map(s => /^\d+$/.test(s) ? Number(s) : s);
+    const deText = getAt(texte.de, path);
+    if(typeof deText !== 'string'){
+      msgs.push({ type:'warn', text:`Zeile ${r + 1}: ID «${id}» gibt es im Code ${name} nicht mehr. Zeile übersprungen.` });
+      continue;
+    }
+    const stelle = label(path);
+    for(const [lang, col] of Object.entries(langCols)){
+      const neu = String(row[col] ?? '').replace(/\r\n/g, '\n');
+      if(!texte[lang]) texte[lang] = {};
+      const alt = getAt(texte[lang], path);
+      if(neu.trim() === ''){
+        if(typeof alt === 'string' && alt !== '') msgs.push({ type:'warn', text:`${name} · ${stelle} · ${lang.toUpperCase()}: Zelle ist leer, der bisherige Text bleibt.` });
+        continue;
+      }
+      if(neu === alt) continue;
+      const phAlt = (deText.match(/\{\w+\}/g) || []).sort().join();
+      const phNeu = (neu.match(/\{\w+\}/g) || []).sort().join();
+      if(phAlt !== phNeu){
+        msgs.push({ type:'err', text:`${name} · ${stelle} · ${lang.toUpperCase()}: Platzhalter fehlt oder ist verändert (${phAlt || 'keiner'} erwartet). Änderung nicht übernommen.` });
+        continue;
+      }
+      setAt(texte[lang], path, neu);
+      changes.push({ name, stelle, lang, alt: alt ?? '', neu });
+    }
+  }
+
+  missingCodes.forEach(n => msgs.push({ type:'err', text:`Der Code «${n}» ist nicht geladen. Bitte in Schritt 1 hinzufügen und Excel erneut einlesen.` }));
+
+  // Neue Quelltexte erzeugen
+  const changedNames = new Set(changes.map(c => c.name));
+  codes.forEach(c => { c.newSource = null; });
+  changedNames.forEach(n => {
+    const c = codes.get(n);
+    c.newSource = replaceTexte(c.source, work.get(n));
+    c.newTexte = work.get(n);
+  });
+
+  if(changes.length) msgs.unshift({ type:'ok', text:`${changes.length} Änderung(en) in ${changedNames.size} Code(s) übernommen.` });
+  else msgs.unshift({ type:'ok', text:'Keine Änderungen gefunden: die Excel-Datei entspricht den geladenen Codes.' });
+
+  showMessages(msgs);
+  renderChanges(changes);
+  renderResult([...changedNames]);
+}
+
+function showMessages(list){
+  const ul = $('msgs'); ul.innerHTML = '';
+  list.forEach(m => { const li = document.createElement('li'); li.className = m.type; li.textContent = m.text; ul.append(li); });
+}
+
+function renderChanges(changes){
+  const tb = $('changes').querySelector('tbody'); tb.innerHTML = '';
+  changes.forEach(c => {
+    const tr = document.createElement('tr');
+    [[c.name], [c.stelle], [c.lang.toUpperCase()], [c.alt, 'old'], [c.neu, 'new']].forEach(([t, cls]) => {
+      const td = document.createElement('td'); td.textContent = t; if(cls) td.className = cls; tr.append(td);
+    });
+    tb.append(tr);
+  });
+  $('changesBox').classList.toggle('hidden', !changes.length);
+}
+
+/* =====================================================================
+   Schritt 4: Vorschau und Download
+   ===================================================================== */
+let curCode = null, curLang = null;
+
+function renderResult(names){
+  $('resultCard').classList.toggle('hidden', !names.length);
+  if(!names.length) return;
+  const ct = $('codeTabs'); ct.innerHTML = '';
+  if(names.length > 1){
+    names.forEach(n => {
+      const b = document.createElement('button'); b.className = 'small'; b.textContent = n;
+      b.onclick = () => { curCode = n; renderPreview(); };
+      ct.append(b);
+    });
+  }
+  curCode = names[0];
+  curLang = null;
+  const dl = $('downloads'); dl.innerHTML = '';
+  names.forEach(n => {
+    const b = document.createElement('button'); b.className = 'main';
+    b.textContent = '⬇ ' + n + ' herunterladen';
+    b.onclick = () => download(n, codes.get(n).newSource);
+    dl.append(b);
+  });
+  renderPreview();
+}
+
+function renderPreview(){
+  const c = codes.get(curCode);
+  const langs = langsOf(c.newTexte);
+  if(!curLang || !langs.includes(curLang)) curLang = langs.find(l => l !== 'de') || 'de';
+  [...$('codeTabs').children].forEach(b => b.classList.toggle('active', b.textContent === curCode));
+  const lt = $('langTabs'); lt.innerHTML = '';
+  langs.forEach(l => {
+    const b = document.createElement('button'); b.className = 'small' + (l === curLang ? ' active' : '');
+    b.textContent = (LANG_NAMES[l] || l).replace(' (Original)', '');
+    b.onclick = () => { curLang = l; renderPreview(); };
+    lt.append(b);
+  });
+  $('preview').srcdoc = c.newSource.replace(/const\s+SPRACHE\s*=\s*['"][^'"]*['"]/, "const SPRACHE = '" + curLang + "'");
+}
+
+function download(name, text){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type:'text/html;charset=utf-8' }));
+  a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* =====================================================================
+   Bedienung
+   ===================================================================== */
+function wireDrop(zoneId, inputId, handler){
+  const zone = $(zoneId), input = $(inputId);
+  input.addEventListener('change', () => { if(input.files.length) handler(input.files); input.value = ''; });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('over'); if(e.dataTransfer.files.length) handler(e.dataTransfer.files); });
+}
+
+wireDrop('dropHtml', 'inHtml', files => loadHtmlFiles([...files]));
+wireDrop('dropXlsx', 'inXlsx', files => importExcel(files[0]).catch(e => showMessages([{ type:'err', text:'Excel konnte nicht gelesen werden: ' + e.message }])));
+$('btnExport').addEventListener('click', exportExcel);
+
+if(typeof XLSX === 'undefined'){
+  showMessages([{ type:'err', text:'Die Excel-Bibliothek konnte nicht geladen werden. Bitte Internetverbindung prüfen und Seite neu laden.' }]);
+}
+</script>
+</body>
+</html>

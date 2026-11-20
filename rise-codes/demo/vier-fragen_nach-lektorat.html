@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vier Fragen</title>
+
+<!-- =====================================================================
+     SPRACHE EINSTELLEN
+     In der jeweiligen Rise-Sprachkopie NUR diese eine Zeile ändern:
+       'de' = Deutsch   'fr' = Français (CH)   'it' = Italiano (CH)   'en' = English (UK)
+     ===================================================================== -->
+<script>
+  const SPRACHE = 'de';
+</script>
+
+<!-- =====================================================================
+     ALLE TEXTE
+     Nur den Text zwischen den Anführungszeichen übersetzen.
+     {n} ist ein Platzhalter für die Nummer und muss stehen bleiben.
+     Französisch: einfach normale Leerzeichen vor ? ! : ; % setzen,
+     die geschützten Leerzeichen werden automatisch eingefügt.
+     ===================================================================== -->
+<script>
+const TEXTE = {
+
+  /* ---------------------------- DEUTSCH ---------------------------- */
+  de: {
+    seitentitel: 'Vier Fragen',
+    titel: 'Vier Fragen, eine nach der anderen',
+    intro: 'Jede Antwort grenzt die Herkunft weiter ein. So lesen Sie jeden Süsswein oder Fortified Wine ohne Etikett.',
+    anleitung: 'Stellen Sie die Fragen in dieser Reihenfolge, vom Glas hinunter in den Keller. Klicken Sie auf eine Stufe, um die Antworten zu öffnen.',
+    start: 'Start: das Glas',
+    frageVon: 'Frage {n} von 4',
+    weiterZu: 'Weiter zu Frage {n}',
+    zumKeller: 'Hinunter in den Keller',
+    fragen: [
+      {
+        frage: 'Wie stehen Süsse und Säure zueinander?',
+        stichwort: 'Süsse und Säure',
+        zeilen: [
+          ['Süss und frisch', 'Viel Säure: kühle Herkunft oder Riesling, Furmint, Chenin'],
+          ['Süss und schwer', 'Wenig Säure: warme Herkunft'],
+          ['Trocken', 'Fino, Oloroso, Sercial: dann ist die Süsse gar nicht das Thema']
+        ],
+        fazit: 'Das ist das Gleichgewicht.'
+      },
+      {
+        frage: 'Wie viel Alkohol hat der Wein?',
+        stichwort: 'Alkohol',
+        zeilen: [
+          ['Unter 8 %', 'Extremer Most, die Hefe hat aufgegeben: TBA oder Eiswein'],
+          ['12 bis 14 %', 'Botrytis oder Trocknung, natürlich vergoren'],
+          ['15 bis 17 %', 'Weinbrand, aber wenig: Sherry, VDN, PX'],
+          ['19 bis 22 %', 'Weinbrand mitten in der Gärung: Port']
+        ],
+        fazit: 'Das ist der Keller.'
+      },
+      {
+        frage: 'Welche Farbe zeigt der Wein?',
+        stichwort: 'Farbe',
+        zeilen: [
+          ['Hellgold', 'Jung, ohne Luft'],
+          ['Tiefgold bis Bernstein', 'Botrytis oder Jahre im Fass'],
+          ['Braun', 'Oxidativ: Oloroso, Tawny, Madeira'],
+          ['Schwarz', 'PX'],
+          ['Dunkelrot mit Depot', 'Vintage Port']
+        ],
+        fazit: 'Das ist die Zeit.'
+      },
+      {
+        frage: 'Wonach duftet der Wein?',
+        stichwort: 'Duft',
+        zeilen: [
+          ['Honig, Safran, Bienenwachs', 'Pilz'],
+          ['Reiner Pfirsich', 'Frost'],
+          ['Rosine, Feige', 'Trocknung'],
+          ['Walnuss, Karamell, Orangenschale', 'Luft und Fass'],
+          ['Mandel, Brot, Salz', 'Flor'],
+          ['Rauch und Säure, die beisst', 'Hitze'],
+          ['Rose und Traube', 'Muscat']
+        ],
+        fazit: 'Das ist der Weg.'
+      }
+    ],
+    kellerTitel: 'Im Keller: die Herkunft',
+    kellerText: 'Vier Antworten, und der Wein verrät, wie er entstanden ist.'
+  },
+
+  /* ---------------------------- FRANÇAIS (CH) ---------------------------- */
+  fr: {
+    seitentitel: 'Quatre questions',
+    titel: 'Quatre questions, l’une après l’autre',
+    intro: 'Chaque réponse cerne un peu plus l’origine. Vous pouvez ainsi lire n’importe quel vin doux ou vin muté sans étiquette.',
+    anleitung: 'Posez les questions dans cet ordre, du verre jusqu’à la cave. Cliquez sur une marche pour afficher les réponses.',
+    start: 'Départ : le verre',
+    frageVon: 'Question {n} sur 4',
+    weiterZu: 'Passer à la question {n}',
+    zumKeller: 'Descendre à la cave',
+    fragen: [
+      {
+        frage: 'Comment la douceur et l’acidité s’équilibrent-elles ?',
+        stichwort: 'Douceur et acidité',
+        zeilen: [
+          ['Doux et frais', 'Beaucoup d’acidité : origine fraîche ou Riesling, Furmint, Chenin'],
+          ['Doux et opulent', 'Peu d’acidité : origine chaude'],
+          ['Sec', 'Fino, Oloroso, Sercial : la douceur n’est alors pas du tout la question']
+        ],
+        fazit: 'C’est l’équilibre.'
+      },
+      {
+        frage: 'Quelle est la teneur en alcool du vin ?',
+        stichwort: 'Alcool',
+        zeilen: [
+          ['Moins de 8 %', 'Moût extrême, les levures ont abandonné : TBA ou Eiswein'],
+          ['12 à 14 %', 'Botrytis ou passerillage, fermentation naturelle'],
+          ['15 à 17 %', 'Eau-de-vie de vin, mais peu : Xérès, VDN, PX'],
+          ['19 à 22 %', 'Eau-de-vie de vin ajoutée en pleine fermentation : Porto']
+        ],
+        fazit: 'C’est la cave.'
+      },
+      {
+        frage: 'De quelle couleur est le vin ?',
+        stichwort: 'Couleur',
+        zeilen: [
+          ['Or pâle', 'Jeune, sans contact avec l’air'],
+          ['Or profond à ambré', 'Botrytis ou années en fût'],
+          ['Brun', 'Oxydatif : Oloroso, Tawny, Madère'],
+          ['Noir', 'PX'],
+          ['Rouge foncé avec dépôt', 'Porto Vintage']
+        ],
+        fazit: 'C’est le temps.'
+      },
+      {
+        frage: 'Quels arômes dégage le vin ?',
+        stichwort: 'Arômes',
+        zeilen: [
+          ['Miel, safran, cire d’abeille', 'Pourriture noble'],
+          ['Pêche pure', 'Gel'],
+          ['Raisin sec, figue', 'Passerillage'],
+          ['Noix, caramel, zeste d’orange', 'Air et fût'],
+          ['Amande, pain, sel', 'Voile de flor'],
+          ['Fumée et acidité mordante', 'Chaleur'],
+          ['Rose et raisin', 'Muscat']
+        ],
+        fazit: 'C’est le chemin.'
+      }
+    ],
+    kellerTitel: 'À la cave : l’origine',
+    kellerText: 'Quatre réponses, et le vin révèle comment il a été élaboré.'
+  },
+
+  /* ---------------------------- ITALIANO (CH) ---------------------------- */
+  it: {
+    seitentitel: 'Quattro domande',
+    titel: 'Quattro domande, una dopo l’altra',
+    intro: 'Ogni risposta restringe ulteriormente l’origine. Così può leggere qualsiasi vino dolce o fortificato senza etichetta.',
+    anleitung: 'Ponga le domande in questo ordine, dal bicchiere giù fino alla cantina. Clicchi su un gradino per aprire le risposte.',
+    start: 'Partenza: il bicchiere',
+    frageVon: 'Domanda {n} di 4',
+    weiterZu: 'Vai alla domanda {n}',
+    zumKeller: 'Scendere in cantina',
+    fragen: [
+      {
+        frage: 'Che rapporto c’è tra dolcezza e acidità?',
+        stichwort: 'Dolcezza e acidità',
+        zeilen: [
+          ['Dolce e fresco', 'Molta acidità: provenienza fresca oppure Riesling, Furmint, Chenin'],
+          ['Dolce e pesante', 'Poca acidità: provenienza calda'],
+          ['Secco', 'Fino, Oloroso, Sercial: qui la dolcezza non è affatto il tema']
+        ],
+        fazit: 'Questo è l’equilibrio.'
+      },
+      {
+        frage: 'Quanto alcol contiene il vino?',
+        stichwort: 'Alcol',
+        zeilen: [
+          ['Meno dell’8%', 'Mosto estremo, i lieviti si sono arresi: TBA o Eiswein'],
+          ['Dal 12 al 14%', 'Botrite o appassimento, fermentazione naturale'],
+          ['Dal 15 al 17%', 'Acquavite di vino, ma poca: Sherry, VDN, PX'],
+          ['Dal 19 al 22%', 'Acquavite di vino aggiunta a metà fermentazione: Porto']
+        ],
+        fazit: 'Questa è la cantina.'
+      },
+      {
+        frage: 'Che colore ha il vino?',
+        stichwort: 'Colore',
+        zeilen: [
+          ['Oro chiaro', 'Giovane, senza contatto con l’aria'],
+          ['Da oro intenso ad ambrato', 'Botrite o anni in botte'],
+          ['Marrone', 'Ossidativo: Oloroso, Tawny, Madeira'],
+          ['Nero', 'PX'],
+          ['Rosso scuro con deposito', 'Porto Vintage']
+        ],
+        fazit: 'Questo è il tempo.'
+      },
+      {
+        frage: 'Di che cosa profuma il vino?',
+        stichwort: 'Profumo',
+        zeilen: [
+          ['Miele, zafferano, cera d’api', 'Muffa nobile'],
+          ['Pesca pura', 'Gelo'],
+          ['Uvetta, fico', 'Appassimento'],
+          ['Noce, caramello, scorza d’arancia', 'Aria e botte'],
+          ['Mandorla, pane, sale', 'Flor'],
+          ['Fumo e acidità tagliente', 'Calore'],
+          ['Rosa e uva', 'Moscato']
+        ],
+        fazit: 'Questo è il percorso.'
+      }
+    ],
+    kellerTitel: 'In cantina: l’origine',
+    kellerText: 'Quattro risposte, e il vino rivela come è nato.'
+  },
+
+  /* ---------------------------- ENGLISH (UK) ---------------------------- */
+  en: {
+    seitentitel: 'Four questions',
+    titel: 'Four questions, one after another',
+    intro: 'Each answer narrows down the origin. This is how you can read any sweet or fortified wine without seeing the label.',
+    anleitung: 'Ask the questions in this order, from the glass down to the cellar. Click on a step to reveal the answers.',
+    start: 'Start: the glass',
+    frageVon: 'Question {n} of 4',
+    weiterZu: 'On to question {n}',
+    zumKeller: 'Down to the cellar',
+    fragen: [
+      {
+        frage: 'How do sweetness and acidity relate to each other?',
+        stichwort: 'Sweetness and acidity',
+        zeilen: [
+          ['Sweet and fresh', 'High acidity: cool climate, or Riesling, Furmint, Chenin'],
+          ['Sweet and heavy', 'Low acidity: warm climate'],
+          ['Dry', 'Fino, Oloroso, Sercial: here sweetness isn’t the point at all']
+        ],
+        fazit: 'This is the balance.'
+      },
+      {
+        frage: 'How much alcohol does the wine have?',
+        stichwort: 'Alcohol',
+        zeilen: [
+          ['Under 8%', 'Extreme must, the yeast has given up: TBA or Eiswein'],
+          ['12 to 14%', 'Botrytis or drying, naturally fermented'],
+          ['15 to 17%', 'Grape spirit, but only a little: Sherry, VDN, PX'],
+          ['19 to 22%', 'Grape spirit added mid-fermentation: Port']
+        ],
+        fazit: 'This is the cellar.'
+      },
+      {
+        frage: 'What colour is the wine?',
+        stichwort: 'Colour',
+        zeilen: [
+          ['Pale gold', 'Young, no contact with air'],
+          ['Deep gold to amber', 'Botrytis or years in cask'],
+          ['Brown', 'Oxidative: Oloroso, Tawny, Madeira'],
+          ['Black', 'PX'],
+          ['Deep red with sediment', 'Vintage Port']
+        ],
+        fazit: 'This is time.'
+      },
+      {
+        frage: 'What does the wine smell of?',
+        stichwort: 'Aroma',
+        zeilen: [
+          ['Honey, saffron, beeswax', 'Noble rot'],
+          ['Pure peach', 'Frost'],
+          ['Raisin, fig', 'Drying'],
+          ['Walnut, caramel, orange peel', 'Air and cask'],
+          ['Almond, bread, salt', 'Flor'],
+          ['Smoke and biting acidity', 'Heat'],
+          ['Rose and grape', 'Muscat']
+        ],
+        fazit: 'This is the path.'
+      }
+    ],
+    kellerTitel: 'In the cellar: the origin',
+    kellerText: 'Four answers, and the wine reveals how it was made.'
+  }
+};
+</script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
+
+  :root{
+    --purple-950:#501688;
+    --purple-800:#7345a0;
+    --purple-600:#9673b8;
+    --purple-300:#b9a2cf;
+    --purple-100:#dcd0e7;
+    --neutral:#ececec;
+    --ink:#2b2430;
+    --line:#dcd0e7;
+    --radius:4px;
+    --indent:72px;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    font-family:'Open Sans', system-ui, sans-serif;
+    color:var(--ink);
+    background:var(--neutral);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{
+    max-width:980px;
+    margin:0 auto;
+    padding:28px 20px 40px;
+  }
+
+  header.top{
+    text-align:center;
+    margin-bottom:24px;
+  }
+
+  header.top h1{
+    font-weight:800;
+    font-size:clamp(26px, 4.6vw, 40px);
+    color:var(--purple-950);
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+  }
+
+  header.top p{
+    font-size:clamp(14px, 2.4vw, 17px);
+    color:var(--purple-800);
+    margin:0;
+    font-weight:600;
+    line-height:1.5;
+  }
+
+  .panel{
+    background:#fff;
+    border:1.5px solid var(--line);
+    border-radius:var(--radius);
+    padding:24px 24px 28px;
+  }
+
+  .instruction{
+    font-size:14px;
+    font-weight:600;
+    color:var(--purple-800);
+    margin:0 0 18px;
+    line-height:1.5;
+  }
+
+  /* ---------- Gläser oben ---------- */
+
+  .glass-top{
+    display:flex;
+    align-items:flex-end;
+    gap:14px;
+    margin-bottom:0;
+    padding-left:12px;
+  }
+
+  .glass-top svg{
+    width:120px;
+    height:auto;
+    display:block;
+  }
+
+  .glass-top .start{
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--purple-800);
+    padding-bottom:8px;
+  }
+
+  /* ---------- Treppe ---------- */
+
+  .stairs{
+    display:flex;
+    flex-direction:column;
+  }
+
+  .step{
+    border-radius:var(--radius) var(--radius) 0 0;
+    position:relative;
+  }
+
+  .step[data-step="1"]{ margin-left:0;                        background:var(--purple-100); color:var(--purple-950); }
+  .step[data-step="2"]{ margin-left:calc(var(--indent) * 1);  background:var(--purple-300); color:var(--purple-950); }
+  .step[data-step="3"]{ margin-left:calc(var(--indent) * 2);  background:var(--purple-600); color:#fff; }
+  .step[data-step="4"]{ margin-left:calc(var(--indent) * 3);  background:var(--purple-800); color:#fff; }
+
+  .step-head{
+    width:100%;
+    border:0;
+    background:transparent;
+    color:inherit;
+    font:inherit;
+    text-align:left;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:16px 18px;
+  }
+
+  .step-head:focus-visible{
+    outline:2px solid var(--purple-950);
+    outline-offset:-4px;
+  }
+
+  .step[data-step="3"] .step-head:focus-visible,
+  .step[data-step="4"] .step-head:focus-visible{ outline-color:#fff; }
+
+  .num{
+    flex:none;
+    width:36px;
+    height:36px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    font-size:16px;
+    background:var(--purple-950);
+    color:#fff;
+  }
+
+  .step[data-step="3"] .num,
+  .step[data-step="4"] .num{ background:#fff; color:var(--purple-950); }
+
+  .head-text{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+
+  .kicker{
+    font-size:11.5px;
+    font-weight:700;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    opacity:.8;
+  }
+
+  .question{
+    font-size:clamp(16px, 2.2vw, 19px);
+    font-weight:800;
+    line-height:1.25;
+  }
+
+  .word{
+    font-size:13px;
+    font-weight:600;
+    opacity:.85;
+  }
+
+  .chev{
+    flex:none;
+    width:22px;
+    height:22px;
+    transition:transform .2s ease;
+  }
+
+  .step.open .chev{ transform:rotate(180deg); }
+
+  .step-body{
+    display:grid;
+    grid-template-rows:0fr;
+    transition:grid-template-rows .25s ease;
+  }
+
+  .step.open .step-body{ grid-template-rows:1fr; }
+
+  .step-inner{
+    overflow:hidden;
+  }
+
+  .content{
+    margin:0 18px 18px;
+    background:#fff;
+    border-radius:var(--radius);
+    padding:14px;
+    color:var(--ink);
+  }
+
+  .rows{
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .rows li{
+    display:grid;
+    grid-template-columns:minmax(120px, 38%) 1fr;
+    gap:12px;
+    background:var(--neutral);
+    border-radius:var(--radius);
+    padding:8px 10px;
+    font-size:13.5px;
+    line-height:1.4;
+  }
+
+  .rows .sign{
+    font-weight:700;
+    color:var(--purple-950);
+  }
+
+  .content-foot{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+
+  .essence{
+    font-size:14px;
+    font-weight:700;
+    color:var(--purple-800);
+  }
+
+  .next{
+    border:0;
+    border-radius:var(--radius);
+    background:var(--purple-950);
+    color:#fff;
+    font:inherit;
+    font-size:13px;
+    font-weight:700;
+    padding:8px 14px;
+    cursor:pointer;
+  }
+
+  .next:hover{ background:var(--purple-800); }
+
+  .next:focus-visible{
+    outline:2px solid var(--purple-600);
+    outline-offset:2px;
+  }
+
+  /* ---------- Keller ---------- */
+
+  .cellar{
+    margin-left:calc(var(--indent) * 4);
+    background:var(--purple-950);
+    color:#fff;
+    border-radius:var(--radius) var(--radius) 0 0;
+    padding:16px 18px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    transition:box-shadow .2s ease;
+  }
+
+  .cellar.reached{ box-shadow:inset 0 0 0 3px var(--purple-300); }
+
+  .cellar svg{
+    flex:none;
+    width:46px;
+    height:auto;
+  }
+
+  .cellar strong{
+    display:block;
+    font-size:16px;
+    font-weight:800;
+  }
+
+  .cellar span{
+    font-size:13px;
+    font-weight:600;
+    opacity:.85;
+  }
+
+  .floor{
+    height:6px;
+    background:var(--purple-950);
+    border-radius:0 0 var(--radius) var(--radius);
+  }
+
+  /* ---------- Mobil ---------- */
+
+  @media (max-width:720px){
+    :root{ --indent:12px; }
+    .panel{ padding:20px 14px 22px; }
+    .glass-top svg{ width:96px; }
+    .step-head{ padding:14px 12px; gap:10px; }
+    .content{ margin:0 10px 12px; padding:10px; }
+    .rows li{ grid-template-columns:1fr; gap:2px; }
+    .cellar{ padding:14px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Ab hier enthält das HTML keine Texte mehr: alles kommt aus TEXTE oben. -->
+<div class="wrap">
+
+  <header class="top">
+    <h1 data-t="titel"></h1>
+    <p data-t="intro"></p>
+  </header>
+
+  <section class="panel">
+
+    <p class="instruction" data-t="anleitung"></p>
+
+    <div class="glass-top" aria-hidden="true">
+      <svg viewBox="0 0 140 110" fill="none" stroke="#501688" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M24 34 Q22 58 40 64 Q58 58 56 34" fill="#b9a2cf" stroke="none"/>
+        <path d="M18 8 H62 Q66 54 40 64 Q14 54 18 8 Z"/>
+        <path d="M20 34 H60"/>
+        <path d="M40 64 V100"/>
+        <path d="M26 104 H54"/>
+        <path d="M84 34 Q82 58 100 64 Q118 58 116 34" fill="#501688" stroke="none"/>
+        <path d="M78 8 H122 Q126 54 100 64 Q74 54 78 8 Z"/>
+        <path d="M80 34 H120"/>
+        <path d="M100 64 V100"/>
+        <path d="M86 104 H114"/>
+      </svg>
+      <span class="start" data-t="start"></span>
+    </div>
+
+    <div class="stairs" id="stairs">
+
+      <!-- Die vier Stufen werden aus TEXTE.fragen erzeugt -->
+
+      <!-- Keller -->
+      <div class="cellar" id="cellar">
+        <svg viewBox="0 0 60 50" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <ellipse cx="12" cy="25" rx="7" ry="20"/>
+          <path d="M12 5 H46"/>
+          <path d="M12 45 H46"/>
+          <ellipse cx="46" cy="25" rx="7" ry="20"/>
+          <path d="M22 6 Q19 25 22 44"/>
+          <path d="M36 6 Q39 25 36 44"/>
+          <circle cx="46" cy="25" r="2"/>
+        </svg>
+        <div>
+          <strong data-t="kellerTitel"></strong>
+          <span data-t="kellerText"></span>
+        </div>
+      </div>
+    </div>
+    <div class="floor"></div>
+
+  </section>
+
+</div>
+
+<script>
+  /* ---------- Sprache wählen (zum Testen auch über ?lang=fr in der Adresse) ---------- */
+  const urlLang = new URLSearchParams(location.search).get('lang');
+  const LANG = TEXTE[urlLang] ? urlLang : (TEXTE[SPRACHE] ? SPRACHE : 'de');
+  const T = TEXTE[LANG];
+
+  // Französisch: geschützte Leerzeichen vor ? ! ; (schmal) und vor : % (normal)
+  function fein(text){
+    if(LANG !== 'fr') return text;
+    return text
+      .replace(/ ([?!;])/g, ' $1')
+      .replace(/ ([:%])/g, ' $1');
+  }
+  function mitNummer(text, n){ return fein(text.replace('{n}', n)); }
+
+  document.documentElement.lang = { de:'de-CH', fr:'fr-CH', it:'it-CH', en:'en-GB' }[LANG];
+  document.title = T.seitentitel;
+
+  document.querySelectorAll('[data-t]').forEach(el => {
+    el.textContent = fein(T[el.dataset.t] || TEXTE.de[el.dataset.t] || '');
+  });
+
+  /* ---------- Stufen aufbauen ---------- */
+  const stairs = document.getElementById('stairs');
+  const cellar = document.getElementById('cellar');
+  const CHEV = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9 L12 15 L18 9"/></svg>';
+
+  function el(tag, cls, text){
+    const e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text != null) e.textContent = fein(text);
+    return e;
+  }
+
+  T.fragen.forEach((f, i) => {
+    const n = i + 1;
+    const letzte = n === T.fragen.length;
+
+    const step = el('div', 'step');
+    step.dataset.step = n;
+
+    const head = el('button', 'step-head');
+    head.type = 'button';
+    head.setAttribute('aria-expanded', 'false');
+    head.setAttribute('aria-controls', 'body-' + n);
+
+    const headText = el('span', 'head-text');
+    headText.append(
+      el('span', 'kicker', mitNummer(T.frageVon, n)),
+      el('span', 'question', f.frage),
+      el('span', 'word', f.stichwort)
+    );
+    head.append(el('span', 'num', String(n)), headText);
+    head.insertAdjacentHTML('beforeend', CHEV);
+
+    const rows = el('ul', 'rows');
+    f.zeilen.forEach(([zeichen, bedeutung]) => {
+      const li = el('li');
+      li.append(el('span', 'sign', zeichen), el('span', null, bedeutung));
+      rows.append(li);
+    });
+
+    const next = el('button', 'next', letzte ? T.zumKeller : mitNummer(T.weiterZu, n + 1));
+    next.type = 'button';
+    next.dataset.next = letzte ? 'cellar' : n + 1;
+
+    const foot = el('div', 'content-foot');
+    foot.append(el('span', 'essence', f.fazit), next);
+
+    const content = el('div', 'content');
+    content.append(rows, foot);
+    const inner = el('div', 'step-inner');
+    inner.append(content);
+    const body = el('div', 'step-body');
+    body.id = 'body-' + n;
+    body.append(inner);
+
+    step.append(head, body);
+    stairs.insertBefore(step, cellar);
+  });
+
+  /* ---------- Verhalten (unverändert) ---------- */
+  const steps = document.querySelectorAll('.step');
+
+  function openStep(n){
+    steps.forEach(s => {
+      const isTarget = s.dataset.step === String(n);
+      s.classList.toggle('open', isTarget);
+      s.querySelector('.step-head').setAttribute('aria-expanded', isTarget ? 'true' : 'false');
+    });
+  }
+
+  function closeAll(){
+    steps.forEach(s => {
+      s.classList.remove('open');
+      s.querySelector('.step-head').setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  steps.forEach(s => {
+    s.querySelector('.step-head').addEventListener('click', () => {
+      cellar.classList.remove('reached');
+      if(s.classList.contains('open')){ closeAll(); }
+      else { openStep(s.dataset.step); }
+    });
+  });
+
+  document.querySelectorAll('.next').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.next;
+      if(target === 'cellar'){
+        closeAll();
+        cellar.classList.add('reached');
+        setTimeout(() => cellar.scrollIntoView({ behavior:'smooth', block:'nearest' }), 260);
+        return;
+      }
+      openStep(target);
+      const el = document.querySelector('.step[data-step="' + target + '"]');
+      setTimeout(() => el.scrollIntoView({ behavior:'smooth', block:'nearest' }), 260);
+    });
+  });
+</script>
+
+</body>
+</html>
