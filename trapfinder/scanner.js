@@ -2,7 +2,7 @@
 // Stellt window.__riseHtmlFinder mit scan(), crawl() und goTo() bereit.
 (() => {
   // Bei neuer Version der Erweiterung den alten Scanner in der Seite ersetzen
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
   if (window.__riseHtmlFinder && window.__riseHtmlFinder.version === VERSION) return;
 
   // Tags, die in normalem Rise-Text nicht vorkommen und auf manuell eingebauten Code hinweisen.
@@ -33,9 +33,17 @@
       .trim();
 
   // Titel können im Editor Objekte sein (z. B. pro Sprache) – Text daraus lesen.
+  const ID_LIKE = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{20,})$/i;
+  // Verweis-ID über die mitgelesenen Textlisten auflösen
+  function resolveId(id) {
+    const cap = window.__riseCapture;
+    const t = cap && cap.strings ? cap.strings[String(id).trim().toLowerCase()] : '';
+    return t ? stripHtml(t) : '';
+  }
+
   function textOf(v, depth = 4) {
     if (v == null || depth < 0) return '';
-    if (typeof v === 'string') return stripHtml(v);
+    if (typeof v === 'string') return ID_LIKE.test(v.trim()) ? resolveId(v) : stripHtml(v);
     if (typeof v === 'number') return String(v);
     if (Array.isArray(v)) return v.map((x) => textOf(x, depth - 1)).filter(Boolean).join(' ');
     if (typeof v === 'object') {
@@ -47,7 +55,12 @@
         }
       }
       for (const k of Object.keys(v)) {
+        if (/^(id|key|uuid|type|lang|locale)$/i.test(k)) continue;
         const t = textOf(v[k], depth - 1);
+        if (t) return t;
+      }
+      for (const k of ['id', 'key', 'uuid']) {
+        const t = typeof v[k] === 'string' ? resolveId(v[k]) : '';
         if (t) return t;
       }
     }
@@ -58,8 +71,10 @@
   function firstText(block) {
     const skip = /^(id|key|type|family|variant|src|url|href|style|class|color|font|align|layout|.*Id|.*Url|.*Color)$/i;
     for (const { key, value } of allStrings(block)) {
-      if (skip.test(key) || /^https?:|^#|^[\w-]{16,}$/.test(value)) continue;
-      const t = stripHtml(value);
+      if (/^https?:|^#/.test(value)) continue;
+      const resolved = ID_LIKE.test(value.trim()) ? resolveId(value) : '';
+      if (!resolved && (skip.test(key) || /^[\w-]{16,}$/.test(value))) continue;
+      const t = resolved || stripHtml(value);
       if (t.length >= 3 && /[A-Za-zÄÖÜäöü]{3}/.test(t) && !/^[{[]/.test(t)) return t.slice(0, 80);
     }
     return '';
@@ -359,6 +374,15 @@
     return out;
   }
 
+  function domLessonTitle(id) {
+    if (!id) return '';
+    for (const a of document.querySelectorAll(`a[href*="${CSS.escape(id)}"]`)) {
+      const t = stripHtml(a.textContent);
+      if (t && !ID_LIKE.test(t)) return t.slice(0, 120);
+    }
+    return '';
+  }
+
   function analyzeCourse(course) {
     const items = [];
     let chapter = '';
@@ -374,7 +398,7 @@
         if (!block || typeof block !== 'object') return;
         for (const d of describeBlock(block)) items.push({
           chapter: chapter || '–',
-          lesson: textOf(lesson.title) || `Lektion ${lessonNo}`,
+          lesson: textOf(lesson.title) || domLessonTitle(lesson.id) || `Lektion ${lessonNo}`,
           lessonNo,
           lessonId: lesson.id,
           blockId: block.id || '',
@@ -546,6 +570,16 @@
       captureAktiv: !!cap,
       gefundeneKurse: cap ? cap.courses.map((c) => ({ lektionen: c.lessons.length, keys: Object.keys(c).slice(0, 15), lektionKeys: Object.keys(c.lessons[0] || {}) })) : [],
       lektionenMitBloecken: cap ? Object.keys(cap.lessons).length : 0,
+      textlisteEintraege: cap && cap.strings ? Object.keys(cap.strings).length : 0,
+      titelAufbau: (() => {
+        const c = cap && cap.courses[0];
+        const l = c && c.lessons.find((x) => x && x.title);
+        const mask = (v, d = 3) =>
+          typeof v === 'string' ? (ID_LIKE.test(v) ? '<ID>' : `<Text ${v.length}>`)
+          : v && typeof v === 'object' && d > 0 ? Object.fromEntries(Object.entries(v).slice(0, 10).map(([k, x]) => [ID_LIKE.test(k) ? '<ID>' : k, mask(x, d - 1)]))
+          : typeof v;
+        return l ? { kursTitel: mask(c.title), lektionsTitel: mask(l.title), aufgeloest: textOf(l.title) ? 'ja' : 'nein' } : null;
+      })(),
       anfragen: cap ? cap.log.map((l) => ({ ...l, url: l.url.replace(/[A-Za-z0-9_-]{12,}/g, '…') })) : [],
       globaleVariablen: Object.keys(window).filter((k) => !std.has(k)).slice(0, 60),
       dataAttribute: [...dataAttrs],
