@@ -4,11 +4,13 @@ let state = null; // { result, frameId }
 
 const KINDS = [
   { id: 'Embed', label: 'Embed (iFrame)' },
-  { id: 'Code-/HTML-Block', label: 'Code-/HTML-Block' },
+  { id: 'Code-/HTML-Block', label: 'HTML (Code-Block)' },
+  { id: 'Custom Block', label: 'Custom Block' },
   { id: 'HTML im Inhalt', label: 'HTML im Inhalt' },
   { id: 'Storyline', label: 'Storyline (SL)' },
   { id: 'Szenario', label: 'Szenario' },
 ];
+const kindLabel = (k) => (KINDS.find((x) => x.id === k) || {}).label || k;
 let selected = new Set(KINDS.map((k) => k.id));
 
 const visibleItems = () => (state && state.result ? state.result.items.filter((it) => selected.has(it.kind)) : []);
@@ -33,7 +35,7 @@ function renderFilters() {
 }
 
 async function onFilterChange() {
-  await chrome.storage.local.set({ selectedKinds: [...selected] });
+  await chrome.storage.local.set({ selectedKinds: [...selected], knownKinds: KINDS.map((k) => k.id) });
   if (state && state.result) render();
   else renderFilters();
 }
@@ -156,8 +158,9 @@ function render() {
     btn.className = 'item';
     btn.title = it.preview || it.name;
     btn.innerHTML =
-      `<span class="name"><span class="badge">${esc(it.kind)}</span>${esc(it.name)}</span>` +
-      `<span class="meta">Block ${it.blockNo}${it.urls[0] ? ' · ' + esc(it.urls[0]) : ''}</span>`;
+      `<span class="name"><span class="badge">${esc(kindLabel(it.kind))}</span>${esc(it.name)}</span>` +
+      `<span class="meta">Block ${it.blockNo}${it.urls[0] ? ' · ' + esc(it.urls[0]) : ''}` +
+      `${it.blockType && it.blockType !== '–' ? ' · Rise-Typ: ' + esc(it.blockType) : ''}</span>`;
     btn.addEventListener('click', () => goTo(it));
     box.appendChild(btn);
   });
@@ -208,7 +211,7 @@ function exportCsv() {
   const cols = ['Nr', 'Kapitel', 'Lektion-Nr', 'Lektion', 'Block-Nr', 'Typ', 'Name', 'Blocktyp (Rise)', 'Quellen', 'Link', 'Block-ID', 'Code-Vorschau'];
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = visibleItems().map((it, i) =>
-    [i + 1, it.chapter, it.lessonNo, it.lesson, it.blockNo, it.kind, it.name, it.blockType, it.urls.join(' | '), it.url, it.blockId, it.preview].map(q).join(';')
+    [i + 1, it.chapter, it.lessonNo, it.lesson, it.blockNo, kindLabel(it.kind), it.name, it.blockType, it.urls.join(' | '), it.url, it.blockId, it.preview].map(q).join(';')
   );
   download(`${fileBase()}.csv`, '﻿' + [cols.map(q).join(';'), ...rows].join('\r\n'), 'text/csv;charset=utf-8');
 }
@@ -221,7 +224,7 @@ function exportHtml() {
     .map(
       (it, i) => `<tr>
   <td>${i + 1}</td><td>${esc(it.chapter)}</td><td>${it.lessonNo}. ${esc(it.lesson)}</td><td>${it.blockNo}</td>
-  <td>${esc(it.kind)}</td><td>${esc(it.name)}</td>
+  <td>${esc(kindLabel(it.kind))}</td><td>${esc(it.name)}</td>
   <td>${it.urls.map((u) => `<a href="${esc(u)}">${esc(u)}</a>`).join('<br>')}</td>
   <td><a href="${esc(it.url)}">öffnen</a></td>
   <td><code>${esc(it.preview)}</code></td></tr>`
@@ -259,8 +262,13 @@ th{background:#f6f8fa}code{font-size:12px;word-break:break-all;white-space:pre-w
     onFilterChange();
   });
 
-  const stored = (await chrome.storage.local.get('selectedKinds')).selectedKinds;
-  if (Array.isArray(stored)) selected = new Set(stored.filter((k) => KINDS.some((x) => x.id === k)));
+  const { selectedKinds: stored, knownKinds } = await chrome.storage.local.get(['selectedKinds', 'knownKinds']);
+  if (Array.isArray(stored)) {
+    selected = new Set(stored.filter((k) => KINDS.some((x) => x.id === k)));
+    // Neu hinzugekommene Kategorien standardmässig aktivieren
+    const known = Array.isArray(knownKinds) ? knownKinds : ['Embed', 'Code-/HTML-Block', 'HTML im Inhalt', 'Storyline', 'Szenario'];
+    KINDS.forEach((k) => { if (!known.includes(k.id)) selected.add(k.id); });
+  }
   renderFilters();
 
   // Letztes Ergebnis für diesen Tab wieder anzeigen

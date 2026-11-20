@@ -210,8 +210,9 @@
     let kind;
     if (storyline) kind = 'Storyline';
     else if (scenario) kind = 'Szenario';
+    else if (/custom/i.test(typeStr)) kind = 'Custom Block';
     else if (/embed|iframe/i.test(typeStr)) kind = 'Embed';
-    else if (/code|html|custom/i.test(typeStr)) kind = 'Code-/HTML-Block';
+    else if (/code|html/i.test(typeStr)) kind = 'Code-/HTML-Block';
     else kind = 'HTML im Inhalt';
 
     const urls = extractUrls(raw, block);
@@ -309,10 +310,11 @@
       const iframe = b.querySelector('iframe');
       const code = b.querySelector('pre, code');
       const scenario = /scenario/i.test(b.className) || b.querySelector('[class*="scenario" i]');
-      if (!iframe && !code && !scenario) return;
+      if (!iframe && !code && !scenario && !/custom/i.test(b.className)) return;
       const src = iframe ? iframe.getAttribute('src') || '' : '';
       const storyline = STORYLINE_SRC.test(src) || /storyline/i.test(b.className) || b.querySelector('[class*="storyline" i]');
-      const kind = storyline ? 'Storyline' : scenario ? 'Szenario' : iframe ? 'Embed' : 'Code-/HTML-Block';
+      const custom = /custom/i.test(b.className) || b.querySelector('[class*="custom-block" i], [class*="customBlock" i]');
+      const kind = storyline ? 'Storyline' : scenario ? 'Szenario' : custom ? 'Custom Block' : iframe ? 'Embed' : 'Code-/HTML-Block';
       const heading = stripHtml((b.querySelector('h1,h2,h3,h4') || {}).textContent);
       out.push({
         chapter: '–',
